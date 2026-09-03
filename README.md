@@ -1,6 +1,9 @@
 # A1 localization workspace
 
-ROS 2 Humble 기반 A1 실차 localization workspace다. 현재 범위는 Hesai PandarXT bringup이며, 향후 3D LiDAR localization, GNSS localization 및 센서 fusion을 추가할 예정이다.
+ROS 2 Humble 기반 A1 실차 localization workspace다. 기존 Hesai PandarXT
+bringup을 유지하면서 공식 MOLA-LO 기반 LiDAR-only mapping 및 map-based
+localization source integration을 제공한다. GNSS/IMU fusion은 현재 범위에
+포함하지 않는다.
 
 ## 지원 환경
 
@@ -9,7 +12,9 @@ ROS 2 Humble 기반 A1 실차 localization workspace다. 현재 범위는 Hesai 
 
 ## 현재 상태
 
-실차에서 다음 PandarXT bringup 항목까지 검증됐다.
+다음 항목은 이전 PandarXT bringup milestone에서 실제 하드웨어로 기록된
+이력이다. 이번 MOLA integration의 현재 하드웨어 검증 결과로 재사용하지
+않는다.
 
 - `a1_lidar_bringup` 빌드 성공
 - 이 workspace의 Hesai 드라이버 실행 성공
@@ -25,9 +30,15 @@ ROS 2 Humble 기반 A1 실차 localization workspace다. 현재 범위는 Hesai 
 - launch에서 runtime YAML과 Firetime 경로 자동 생성
 - PandarXT 테스트에서 `/lidar_imu` publisher만 생성되고 10초 동안 실제 IMU 메시지는 발행되지 않음
 
-현재는 **LiDAR bringup까지만 검증됐으며 localization 알고리즘은 아직 구현 전**이다.
+MOLA-LO source integration, dependency/build/static validation, launch/config
+inspection은 이 workspace에서 수행한다. 현재 PandarXT가 물리적으로 연결되어
+있지 않으므로 live sensor, odometry, mapping, localization 결과는 모두
+`PENDING — requires PandarXT hardware`이며 임의로 PASS 처리하지 않는다.
 
-PandarXT의 `/lidar_imu`를 localization 입력으로 사용하지 않는다. 향후 motion deskew와 localization에는 외부 IMU가 필요하며, 외부 장치는 `/imu/data_raw` 같은 별도 topic 이름을 사용할 예정이다.
+PandarXT의 `/lidar_imu`를 localization 입력으로 사용하지 않는다. 현재
+MOLA-LO는 LiDAR registration에서 추정한 twist로 scan deskew를 수행한다.
+향후 별도 fusion 단계에서 외부 IMU를 사용한다면 `/imu/data_raw` 같은 별도
+topic 이름을 사용한다.
 
 ## 저장소 받기
 
@@ -85,7 +96,34 @@ ros2 launch a1_lidar_bringup pandarxt.launch.py timestamp_type:=0
 
 `--symlink-install`에서는 runtime YAML의 Firetime 경로가 source 디렉터리를 가리킬 수 있으며 이는 정상이다.
 
-Firetime correction은 LiDAR 채널별 발광 시각 오차를 보정하고, PTP는 LiDAR 시계를 Grandmaster와 동기화한다. Motion deskew는 한 scan 동안 차량이 움직인 영향을 외부 IMU/odometry로 보상하는 별도 처리다. 어느 하나가 나머지를 대신하지 않는다.
+Firetime correction은 LiDAR 채널별 발광 시각 오차를 보정하고, PTP는 LiDAR
+시계를 Grandmaster와 동기화한다. Motion deskew는 한 scan 동안 차량이
+움직인 영향을 LiDAR registration twist 또는 별도 motion source로 보상하는
+처리다. 어느 하나가 나머지를 대신하지 않는다.
+
+## MOLA-LO mapping 및 localization
+
+LiDAR-only mapping은 기존 PandarXT launch를 include한다.
+
+```zsh
+ros2 launch a1_mola_localization mapping.launch.py
+```
+
+저장한 MOLA map prefix로 localization-only mode를 실행한다.
+
+```zsh
+ros2 launch a1_mola_localization localization.launch.py \
+  map:=${HOME}/.ros/a1_localization/maps/track/map
+```
+
+자세한 설치, interface, map 저장, initial pose, output 및 검증 경계는 다음
+문서를 따른다.
+
+- [MOLA-LO installation](docs/mola_installation.md)
+- [PandarXT to MOLA-LO interface](docs/pandarxt_mola_interface.md)
+- [LiDAR-only mapping](docs/mola_mapping.md)
+- [Map-based LiDAR localization](docs/mola_localization.md)
+- [Verification record](docs/verification.md)
 
 ## Read-only 검증
 
@@ -113,13 +151,21 @@ ros2 daemon start
 ```text
 .
 ├── docs/
-│   └── pandarxt_setup.md        # LiDAR/host/PTP 설정 기준
+│   ├── mola_installation.md     # MOLA source/dependency/build 기준
+│   ├── mola_localization.md     # map load, initial pose, output interface
+│   ├── mola_mapping.md          # mapping 및 map 저장 workflow
+│   ├── pandarxt_mola_interface.md # PointCloud2/deskew/TF contract
+│   ├── pandarxt_setup.md        # LiDAR/host/PTP 설정 기준
+│   └── verification.md          # static 결과와 hardware PENDING 경계
 ├── scripts/
+│   ├── check_pandarxt_pointcloud.py # field/timestamp live diagnostic
 │   ├── setup_lidar_host.sh      # 호스트 NetworkManager/sysctl 설정
 │   └── verify_lidar.sh          # read-only LiDAR/ROS 검증
 ├── system/
 │   └── 90-hesai-lidar.conf      # 호스트 UDP receive-buffer 설정
 └── src/
     ├── HesaiLidar_ROS_2.0/      # Git submodule
-    └── a1_lidar_bringup/        # PandarXT launch/config/calibration
+    ├── a1_lidar_bringup/        # PandarXT launch/config/calibration
+    ├── a1_mola_localization/    # project-owned MOLA overlay
+    └── mola_lidar_odometry/     # official pinned Git submodule
 ```

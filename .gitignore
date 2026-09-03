@@ -8,3 +8,6 @@ __pycache__/
 *.mcap
 *.db3
 rosbag2_*/
+rosbag*/
+*.mm
+*.simplemap

@@ -1,0 +1,15 @@
+a1_mola:
+  lidar_topic: /lidar_points
+  lidar_frame: hesai_lidar
+  base_frame: base_link
+  pipeline: lidar3d-gicp-optimize-twist.yaml
+  lidar_qos_reliability: best_effort
+  lidar_qos_depth: 10
+  deskew_method: MotionCompensationMethod::Linear
+  optimize_twist: true
+  require_point_timestamps: true
+  point_stamp_adjust_method: TimestampAdjustMethod::MiddleIsZero
+  publish_deskewed_scans: false
+  use_imu: false
+  use_gnss: false
+  publish_localization_following_rep105: false

@@ -34,7 +34,11 @@
 
 Mapping 데이터 수집과 localization 실행에서 Return Mode를 동일하게 유지해야 포인트 구성 차이로 인한 입력 불일치를 피할 수 있다.
 
-PandarXT 테스트에서는 `/lidar_imu` publisher만 생성되고 10초 동안 실제 IMU 메시지는 발행되지 않았다. PandarXT가 유효한 IMU 데이터를 제공한다고 가정하지 않으며 `send_imu_ros`는 비활성화한다. 향후 motion deskew와 localization에는 외부 IMU를 사용하고 `/imu/data_raw` 같은 별도 topic 이름으로 연결할 예정이다.
+PandarXT 테스트에서는 `/lidar_imu` publisher만 생성되고 10초 동안 실제 IMU
+메시지는 발행되지 않았다. PandarXT가 유효한 IMU 데이터를 제공한다고
+가정하지 않으며 `send_imu_ros`는 비활성화한다. 현재 MOLA-LO의 LiDAR-only
+pipeline은 LiDAR registration twist로 deskew한다. 향후 별도 fusion 단계에서
+외부 IMU를 사용한다면 `/imu/data_raw` 같은 별도 topic 이름으로 연결한다.
 
 ## 호스트 PC 설정
 
@@ -88,9 +92,12 @@ launch 파일은 package share의 `config/pandarxt.yaml.in`을 읽어 Firetime �
 
 - **Firetime correction**은 레이저 채널별 발광 시각 차이를 보정하는 LiDAR calibration이다.
 - **PTP 동기화**는 LiDAR clock을 GNSS Grandmaster 등 기준 시계와 맞추는 작업이다.
-- **Motion deskew**는 한 scan을 수집하는 동안 차량이 이동한 영향을 외부 IMU 또는 odometry로 보상하는 별도 알고리즘이다.
+- **Motion deskew**는 한 scan을 수집하는 동안 차량이 이동한 영향을 LiDAR
+  registration twist 또는 별도 motion source로 보상하는 알고리즘이다.
 
-Firetime이나 PTP가 motion deskew를 자동으로 수행하지 않으며, deskew에는 시간 정렬된 외부 motion 입력이 필요하다.
+Firetime이나 PTP가 motion deskew를 자동으로 수행하지 않는다. Deskew에는
+per-point timestamp와 LiDAR registration에서 추정한 twist 또는 별도의
+시간 정렬된 motion source가 필요하다.
 
 ## 검증과 해석 주의사항
 

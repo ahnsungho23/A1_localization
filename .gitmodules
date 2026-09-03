@@ -1,3 +1,6 @@
 [submodule "src/HesaiLidar_ROS_2.0"]
 	path = src/HesaiLidar_ROS_2.0
 	url = https://github.com/HesaiTechnology/HesaiLidar_ROS_2.0.git
+[submodule "src/mola_lidar_odometry"]
+	path = src/mola_lidar_odometry
+	url = https://github.com/MOLAorg/mola_lidar_odometry.git

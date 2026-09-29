@@ -4,3 +4,6 @@
 [submodule "src/mola_lidar_odometry"]
 	path = src/mola_lidar_odometry
 	url = https://github.com/MOLAorg/mola_lidar_odometry.git
+[submodule "src/mp2p_icp"]
+	path = src/mp2p_icp
+	url = https://github.com/MOLAorg/mp2p_icp.git

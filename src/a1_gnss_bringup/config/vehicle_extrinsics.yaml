@@ -1,0 +1,27 @@
+# Measured sensor mounting poses relative to base_link (REP-103: x forward,
+# y left, z up). Translations in meters, angles in degrees, applied as
+# fixed-axis roll, pitch, yaw.
+#
+# All values are null until measured: vehicle_tf.launch.py and gnss.launch.py
+# refuse to start while any value is null.
+#
+# base_link origin: TODO record the chosen reference point (e.g. rear axle
+# center at ground level) here when it is decided.
+base_link_to_ins:
+  # Applanix output point as configured on the device (not shifted to base_link).
+  frame_id: ins
+  x: null
+  y: null
+  z: null
+  roll: null
+  pitch: null
+  yaw: null
+
+base_link_to_lidar:
+  frame_id: hesai_lidar
+  x: null
+  y: null
+  z: null
+  roll: null
+  pitch: null
+  yaw: null

@@ -1,0 +1,34 @@
+# Parameters for trimble_driver_ros gsof_client_node (submodule src/trimble_driver_ros,
+# humble branch). The node name in the launch file must stay "gsof_client".
+#
+# The device IP is intentionally empty: gnss.launch.py refuses to start until
+# it is supplied (launch argument ip:=..., or edit this file).
+#
+# On the Applanix web interface (IO Configuration > Port Summary) enable GSOF
+# #49 (INS Full Navigation Info) AND #50 (INS RMS Info) on the TCP port below.
+# Without #50 the NavSatFix has no covariance and MOLA's georeferencing drops
+# every GNSS sample.
+gsof_client:
+  ros__parameters:
+    ip: ""
+    port: 5017
+
+    # Label written into /gsof_client/odom header.frame_id. The relay ignores
+    # it and republishes in the configured odom frame.
+    parent_frame: "odom"
+    # INS output point. A static base_link -> ins transform (measured) is
+    # published by vehicle_tf.launch.py; the Applanix output point itself must
+    # NOT be shifted to base_link on the device, or the lever arm is applied twice.
+    child_frame: "ins"
+
+    # TF is published by gnss_odom_relay.py as odom -> base_link instead; a
+    # driver odom -> ins TF would give "ins" two parents.
+    publish_tf: false
+    # ENU position / FLU orientation (REP-103) instead of NED.
+    publish_rep103: true
+    publish_ros_msgs: true
+    publish_gsof_msgs: true
+
+    # GPS-epoch time (1980-01-06). gnss_odom_relay.py converts it to UTC Unix
+    # time; the host clock is disciplined by the TM2000A through ptp4l.
+    time_source: "gps"

@@ -2,8 +2,9 @@
 
 ROS 2 Humble 기반 A1 실차 localization workspace다. 기존 Hesai PandarXT
 bringup을 유지하면서 공식 MOLA-LO 기반 LiDAR-only mapping 및 map-based
-localization source integration을 제공한다. GNSS/IMU fusion은 현재 범위에
-포함하지 않는다.
+localization source integration을 제공한다. Applanix GNSS/INS는 REP-105
+구조(`odom -> base_link`는 INS, `map -> odom`은 MOLA)로 결합하며, MOLA-LO
+자체의 pose 추정에는 GNSS/IMU를 사용하지 않는다.
 
 ## 지원 환경
 
@@ -123,7 +124,14 @@ ros2 launch a1_mola_localization localization.launch.py \
 - [PandarXT to MOLA-LO interface](docs/pandarxt_mola_interface.md)
 - [LiDAR-only mapping](docs/mola_mapping.md)
 - [Map-based LiDAR localization](docs/mola_localization.md)
+- [Applanix GNSS/INS integration (REP-105)](docs/gnss_integration.md)
 - [Verification record](docs/verification.md)
+
+Applanix GNSS/INS를 결합할 때는 `use_gnss:=true`를 추가한다. 이때 MOLA는
+REP-105(`map -> odom`)로 발행하고, `odom -> base_link`는
+`a1_gnss_bringup`의 relay가 발행한다. 실측 extrinsics와 장비 IP가 없으면
+launch가 시작을 거부한다. 자세한 내용은
+[GNSS integration](docs/gnss_integration.md)을 따른다.
 
 ## Read-only 검증
 
@@ -151,6 +159,7 @@ ros2 daemon start
 ```text
 .
 ├── docs/
+│   ├── gnss_integration.md      # Applanix 드라이버, extrinsics, 시각 변환, REP-105
 │   ├── mola_installation.md     # MOLA source/dependency/build 기준
 │   ├── mola_localization.md     # map load, initial pose, output interface
 │   ├── mola_mapping.md          # mapping 및 map 저장 workflow
@@ -159,13 +168,19 @@ ros2 daemon start
 │   └── verification.md          # static 결과와 hardware PENDING 경계
 ├── scripts/
 │   ├── check_pandarxt_pointcloud.py # field/timestamp live diagnostic
+│   ├── record_baseline_bag.sh   # 오프라인 baseline용 raw topic 녹화
+│   ├── replay_baseline.sh       # baseline bag을 MOLA mapping/localization에 재생
 │   ├── setup_lidar_host.sh      # 호스트 NetworkManager/sysctl 설정
 │   └── verify_lidar.sh          # read-only LiDAR/ROS 검증
 ├── system/
-│   └── 90-hesai-lidar.conf      # 호스트 UDP receive-buffer 설정
+│   ├── 90-hesai-lidar.conf      # 호스트 UDP receive-buffer 설정
+│   └── ptp4l-slave.conf         # TM2000A PTP slave 설정
 └── src/
     ├── HesaiLidar_ROS_2.0/      # Git submodule
+    ├── a1_gnss_bringup/         # Applanix launch/config, extrinsics, odom relay
     ├── a1_lidar_bringup/        # PandarXT launch/config/calibration
     ├── a1_mola_localization/    # project-owned MOLA overlay
-    └── mola_lidar_odometry/     # official pinned Git submodule
+    ├── mola_lidar_odometry/     # official pinned Git submodule
+    ├── mp2p_icp/                # official pinned Git submodule
+    └── trimble_driver_ros/      # Git submodule (humble branch)
 ```

@@ -11,5 +11,6 @@ a1_mola:
   point_stamp_adjust_method: TimestampAdjustMethod::MiddleIsZero
   publish_deskewed_scans: false
   use_imu: false
+  # Default of the use_gnss launch argument. true also switches MOLA to
+  # REP-105 (map->odom), since a1_gnss_bringup then owns odom->base_link.
   use_gnss: false
-  publish_localization_following_rep105: false

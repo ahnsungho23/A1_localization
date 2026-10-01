@@ -2,9 +2,10 @@
 #
 # Record the raw sensor topics needed for an offline baseline (C-2 / C-5).
 #
-# The base topic list is fixed. Applanix GNSS/IMU topics are not known yet;
-# append them as extra arguments once the driver is confirmed, e.g.
-#   ./scripts/record_baseline_bag.sh /applanix/navsatfix /applanix/imu
+# The base topic list is fixed. Pass -g to also record the raw Applanix driver
+# outputs (trimble_driver_ros, GPS-epoch stamps); replay them through
+# a1_gnss_bringup gnss.launch.py start_driver:=false to get UTC-stamped
+# /a1_gnss/* topics and odom->base_link.
 #
 # Do NOT record MOLA outputs here. The point of this bag is to be replayable
 # against any future MOLA configuration, so only raw inputs belong in it.
@@ -18,17 +19,25 @@ readonly BASE_TOPICS=(
   /tf
   /tf_static
 )
+readonly GNSS_TOPICS=(
+  /gsof_client/odom
+  /gsof_client/navsat
+  /gsof_client/gsof/ins_solution_49
+  /gsof_client/gsof/ins_solution_rms_50
+)
 readonly DEFAULT_OUT_ROOT="${HOME}/.ros/a1_localization/bags"
 readonly ROS_COMMAND_TIMEOUT="${ROS_COMMAND_TIMEOUT:-10s}"
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [-o <output-dir>] [extra-topic ...]
+Usage: $0 [-o <output-dir>] [-g] [extra-topic ...]
 
 Records raw sensor topics into an mcap rosbag2 directory.
   -o <output-dir>   Bag directory to create
                     (default: ${DEFAULT_OUT_ROOT}/a1_baseline_<YYYYmmdd_HHMMSS>)
-  extra-topic       Additional topics, e.g. Applanix GNSS/IMU once known
+  -g                Also record the raw Applanix GNSS/INS topics:
+$(printf '                      %s\n' "${GNSS_TOPICS[@]}")
+  extra-topic       Additional topics
 
 Base topics always recorded:
 $(printf '  %s\n' "${BASE_TOPICS[@]}")
@@ -43,9 +52,11 @@ warn() { printf '[WARN] %s\n' "$1" >&2; }
 fail() { printf '[FAIL] %s\n' "$1" >&2; exit 1; }
 
 out_dir=""
-while getopts ":o:h" opt; do
+record_gnss=false
+while getopts ":o:gh" opt; do
   case "${opt}" in
     o) out_dir="${OPTARG}" ;;
+    g) record_gnss=true ;;
     h) usage; exit 0 ;;
     \?) usage; fail "Unknown option: -${OPTARG}" ;;
     :) usage; fail "Option -${OPTARG} requires a value" ;;
@@ -53,6 +64,9 @@ while getopts ":o:h" opt; do
 done
 shift $((OPTIND - 1))
 extra_topics=("$@")
+if [[ "${record_gnss}" == true ]]; then
+  extra_topics=("${GNSS_TOPICS[@]}" "${extra_topics[@]}")
+fi
 
 if [[ -z "${out_dir}" ]]; then
   out_dir="${DEFAULT_OUT_ROOT}/a1_baseline_$(date +%Y%m%d_%H%M%S)"

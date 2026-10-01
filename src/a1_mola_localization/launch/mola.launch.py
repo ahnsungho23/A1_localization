@@ -90,13 +90,33 @@ def _launch_setup(context, package_share, defaults):
         "publish_deskewed_scans",
         LaunchConfiguration("publish_deskewed_scans").perform(context),
     )
+    use_gnss = _parse_bool(
+        "use_gnss", LaunchConfiguration("use_gnss").perform(context)
+    )
+    start_gnss_driver = _parse_bool(
+        "start_gnss_driver",
+        LaunchConfiguration("start_gnss_driver").perform(context),
+    )
+    gnss_topic = LaunchConfiguration("gnss_topic").perform(context).strip()
+
+    if use_gnss:
+        if not gnss_topic:
+            raise RuntimeError("use_gnss:=true requires a non-empty gnss_topic")
+        if use_fixed_pose:
+            # a1_gnss_bringup publishes the measured base_link->hesai_lidar TF;
+            # a second, launch-argument LiDAR pose could silently disagree.
+            raise RuntimeError(
+                "use_fixed_lidar_pose cannot be combined with use_gnss: the "
+                "LiDAR pose comes from a1_gnss_bringup vehicle_extrinsics.yaml"
+            )
 
     actions = [
         LogInfo(
             msg=(
                 f"[a1_mola_localization] mode={mode}, input={lidar_topic} "
                 f"(expected frame={lidar_frame}), base={base_frame}, "
-                f"pipeline={pipeline}"
+                f"pipeline={pipeline}, use_gnss={use_gnss}"
+                + (f" (gnss={gnss_topic}, REP-105 map->odom)" if use_gnss else "")
             )
         ),
         SetEnvironmentVariable(
@@ -148,6 +168,26 @@ def _launch_setup(context, package_share, defaults):
             )
         )
 
+    if use_gnss and start_gnss_driver:
+        # Applanix driver + measured static TFs + odom->base_link relay.
+        gnss_launch = (
+            Path(get_package_share_directory("a1_gnss_bringup"))
+            / "launch"
+            / "gnss.launch.py"
+        )
+        actions.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(str(gnss_launch)),
+                launch_arguments={
+                    "ip": LaunchConfiguration("gnss_ip"),
+                    "port": LaunchConfiguration("gnss_port"),
+                    "base_frame": base_frame,
+                    "odom_frame": "odom",
+                    "use_sim_time": LaunchConfiguration("use_sim_time"),
+                }.items(),
+            )
+        )
+
     is_mapping = mode == "mapping"
     mola_arguments = {
         "lidar_topic_name": lidar_topic,
@@ -164,13 +204,17 @@ def _launch_setup(context, package_share, defaults):
         "use_imu_for_lio": "False",
         "imu_gravity_correction": "False",
         "imu_topic_name": "",
-        "gnss_topic_name": "",
+        # GNSS is only recorded into the simplemap (for offline
+        # georeferencing); LO does not use it for pose estimation.
+        "gnss_topic_name": gnss_topic if use_gnss else "",
         "gpsfix_topic_name": "",
         "gnss_mode": "none",
         "forward_ros_tf_odom_to_mola": "False",
         "odom_topic_name": "",
         "use_state_estimator": "False",
-        "publish_localization_following_rep105": "False",
+        # With GNSS the relay owns odom->base_link, so MOLA must publish
+        # map->odom; otherwise base_link would get two parents.
+        "publish_localization_following_rep105": str(use_gnss),
         "start_mapping_enabled": str(is_mapping),
         "start_active": str(is_mapping),
         "generate_simplemap": str(is_mapping),
@@ -304,6 +348,35 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "publish_deskewed_scans",
             default_value=str(defaults["publish_deskewed_scans"]).lower(),
+        ),
+        DeclareLaunchArgument(
+            "use_gnss",
+            default_value=str(defaults["use_gnss"]).lower(),
+            description=(
+                "Applanix GNSS/INS: record NavSatFix into the simplemap and "
+                "publish REP-105 map->odom (odom->base_link from a1_gnss_bringup)"
+            ),
+        ),
+        DeclareLaunchArgument(
+            "start_gnss_driver",
+            default_value="true",
+            description=(
+                "With use_gnss: include a1_gnss_bringup gnss.launch.py "
+                "(false when it is launched separately)"
+            ),
+        ),
+        DeclareLaunchArgument(
+            "gnss_topic",
+            default_value="/a1_gnss/navsat",
+            description="NavSatFix with UTC stamps (republished by gnss_odom_relay)",
+        ),
+        DeclareLaunchArgument(
+            "gnss_ip", default_value="",
+            description="Applanix IP (passed to gnss.launch.py)",
+        ),
+        DeclareLaunchArgument(
+            "gnss_port", default_value="",
+            description="Applanix GSOF TCP port (passed to gnss.launch.py)",
         ),
         DeclareLaunchArgument(
             "map_output_path",

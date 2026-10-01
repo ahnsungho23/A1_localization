@@ -7,3 +7,7 @@
 [submodule "src/mp2p_icp"]
 	path = src/mp2p_icp
 	url = https://github.com/MOLAorg/mp2p_icp.git
+[submodule "src/trimble_driver_ros"]
+	path = src/trimble_driver_ros
+	url = https://github.com/trimble-oss/trimble_driver_ros.git
+	branch = humble

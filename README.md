@@ -114,7 +114,7 @@ ros2 launch a1_mola_localization mapping.launch.py
 
 ```zsh
 ros2 launch a1_mola_localization localization.launch.py \
-  map:=${HOME}/.ros/a1_localization/maps/track/map
+  map:=$(pwd)/maps/track/map
 ```
 
 자세한 설치, interface, map 저장, initial pose, output 및 검증 경계는 다음

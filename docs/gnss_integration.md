@@ -81,7 +81,7 @@ ros2 launch a1_mola_localization mapping.launch.py \
 
 ros2 launch a1_mola_localization localization.launch.py \
   use_gnss:=true gnss_ip:=<applanix-ip> timestamp_type:=0 \
-  map:=${HOME}/.ros/a1_localization/maps/track/map
+  map:=$(pwd)/maps/track/map
 ```
 
 `use_gnss:=true` sets MOLA's `gnss_topic_name` to `/a1_gnss/navsat`, switches

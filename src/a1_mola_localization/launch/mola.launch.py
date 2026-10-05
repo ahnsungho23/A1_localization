@@ -306,9 +306,14 @@ def generate_launch_description():
             / str(defaults["pipeline"])
         )
 
-    default_map_prefix = (
-        Path.home() / ".ros" / "a1_localization" / "maps" / "track" / "map"
-    )
+    # With --symlink-install this file resolves into <workspace>/src, so maps
+    # go to <workspace>/maps/track/map; otherwise fall back to ~/.ros.
+    workspace = Path(__file__).resolve().parents[3]
+    if (workspace / "src" / "a1_mola_localization").is_dir():
+        default_map_dir = workspace / "maps"
+    else:
+        default_map_dir = Path.home() / ".ros" / "a1_localization" / "maps"
+    default_map_prefix = default_map_dir / "track" / "map"
 
     arguments = [
         DeclareLaunchArgument(

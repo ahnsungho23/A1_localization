@@ -11,3 +11,8 @@ rosbag2_*/
 rosbag*/
 *.mm
 *.simplemap
+
+# generated MOLA maps (*.mm/*.simplemap already ignored)
+/maps/**
+!/maps/track/
+!/maps/track/.gitkeep

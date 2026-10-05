@@ -22,7 +22,7 @@ map save/load services, and localization are provided by the non-GUI MOLA
 modules and do not require the MOLA GUI.
 
 The default map prefix is
-`~/.ros/a1_localization/maps/track/map`. To choose another prefix:
+`<workspace>/maps/track/map`. To choose another prefix:
 
 ```zsh
 ros2 launch a1_mola_localization mapping.launch.py \
@@ -46,7 +46,7 @@ MOLA's official save interface takes a prefix, not a `.pcd` filename:
 
 ```zsh
 ros2 service call /map_save mola_msgs/srv/MapSave \
-  "{map_path: '${HOME}/.ros/a1_localization/maps/track/map'}"
+  "{map_path: '$(pwd)/maps/track/map'}"
 ```
 
 Verify that the response has `success: true`. The expected files are:

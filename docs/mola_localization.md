@@ -8,7 +8,7 @@ Supply the map prefix or its `.mm` filename:
 source /opt/ros/humble/setup.zsh
 source install/setup.zsh
 ros2 launch a1_mola_localization localization.launch.py \
-  map:=${HOME}/.ros/a1_localization/maps/track/map
+  map:=$(pwd)/maps/track/map
 ```
 
 The launch refuses to start without the `.mm` file. It passes the metric map

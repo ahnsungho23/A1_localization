@@ -7,21 +7,21 @@
 #
 # base_link origin: TODO record the chosen reference point (e.g. rear axle
 # center at ground level) here when it is decided.
-base_link_to_ins:
+base_link_to_ins:            
   # Applanix output point as configured on the device (not shifted to base_link).
   frame_id: ins
-  x: null
-  y: null
-  z: null
-  roll: null
-  pitch: null
-  yaw: null
+  x: 0.49
+  y: 0.0
+  z: -0.34
+  roll: 0
+  pitch: 0
+  yaw: 0
 
 base_link_to_lidar:
   frame_id: hesai_lidar
-  x: null
-  y: null
-  z: null
-  roll: null
-  pitch: null
-  yaw: null
+  x: 0
+  y: 0
+  z: 0
+  roll: 0
+  pitch: 0
+  yaw: 0

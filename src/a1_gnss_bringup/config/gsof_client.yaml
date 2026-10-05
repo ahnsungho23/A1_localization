@@ -10,7 +10,7 @@
 # every GNSS sample.
 gsof_client:
   ros__parameters:
-    ip: ""
+    ip: "192.168.53.100"
     port: 5017
 
     # Label written into /gsof_client/odom header.frame_id. The relay ignores

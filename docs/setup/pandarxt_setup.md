@@ -36,7 +36,7 @@ Mapping 데이터 수집과 localization 실행에서 Return Mode를 동일하�
 
 PandarXT 테스트에서는 `/lidar_imu` publisher만 생성되고 10초 동안 실제 IMU
 메시지는 발행되지 않았다. PandarXT가 유효한 IMU 데이터를 제공한다고
-가정하지 않으며 `send_imu_ros`는 비활성화한다. 현재 MOLA-LO의 LiDAR-only
+가정하지 않으며 `send_imu_ros`는 비활성화한다. 현재 MOLA-LO
 pipeline은 LiDAR registration twist로 deskew한다. 향후 별도 fusion 단계에서
 외부 IMU를 사용한다면 `/imu/data_raw` 같은 별도 topic 이름으로 연결한다.
 
@@ -70,7 +70,7 @@ sudo ./tools/host/setup_lidar_host.sh enp3s0 192.168.1.101/24
 
 ## 시간 동기화
 
-LiDAR의 Clock source가 PTP여도 현재 Grandmaster가 없으므로 PTP 상태가 Free Run인 것은 정상이다. 지금은 host receive time을 사용한다.
+LiDAR의 Clock source가 PTP여도 TM2000A Grandmaster와의 PTP lock이 아직 확인되지 않았으므로 PTP 상태가 Free Run일 수 있다. 지금은 LiDAR와 Applanix 모두 host receive time을 사용한다.
 
 ```bash
 ros2 launch a1_lidar_bringup pandarxt.launch.py timestamp_type:=1

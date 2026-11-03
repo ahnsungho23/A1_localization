@@ -40,7 +40,7 @@ The cloud header uses the frame-start timestamp. MOLA is configured with
 `TimestampAdjustMethod::MiddleIsZero` before applying constant-velocity
 deskew.
 
-## LiDAR-only deskew
+## Deskew
 
 The selected upstream pipeline is
 `lidar3d-gicp-optimize-twist.yaml`, with these A1 overrides:
@@ -49,7 +49,8 @@ The selected upstream pipeline is
 - `MOLA_OPTIMIZE_TWIST=true`
 - `MOLA_IGNORE_NO_POINT_STAMPS=false`
 - IMU gravity correction disabled
-- IMU, GNSS, and external odometry topic inputs disabled
+- IMU and external odometry topic inputs disabled; GNSS (`/a1_gnss/navsat`) is
+  only recorded into the simplemap, not used for pose estimation
 
 Missing point timestamps are therefore a hard failure instead of silently
 disabling deskew. MOLA estimates twist from LiDAR registration; PandarXT IMU
@@ -57,28 +58,18 @@ is not used.
 
 ## TF ownership
 
-The existing Hesai bringup publishes no TF. The normal integration path
-expects another robot-description owner to publish the calibrated transform:
+The Hesai bringup publishes no TF. `a1_gnss_bringup` publishes the measured
+static transforms from `vehicle_extrinsics.yaml`, and MOLA looks up
+`base_link -> hesai_lidar` in TF:
 
 ```text
-map -> base_link -> hesai_lidar
+map ──[MOLA]──▶ odom ──[gnss_odom_relay]──▶ base_link ──[static]──▶ hesai_lidar
+                                                     └──[static]──▶ ins
 ```
 
-MOLA publishes `map -> base_link` directly. REP-105 mode is intentionally off
-because this workspace has no verified external `odom -> base_link` source.
-The integration launch also disables MOLA's optional
+MOLA runs in REP-105 mode and publishes `map -> odom`; the Applanix relay owns
+`odom -> base_link`. The integration launch also disables MOLA's optional
 `base_footprint -> base_link` static transform to avoid duplicate ownership.
-
-If no robot TF publisher is available, an explicit calibrated sensor pose can
-be supplied without publishing a new TF:
-
-```zsh
-use_fixed_lidar_pose:=true \
-lidar_pose:="[x,y,z,yaw_deg,pitch_deg,roll_deg]"
-```
-
-The identity default is ignored unless fixed-pose mode is explicitly enabled.
-Do not enable it with zero values unless that is the measured mounting pose.
 
 ## Live diagnostic
 
@@ -91,6 +82,4 @@ With the driver running, inspect one full cloud:
 ```
 
 The script checks field types, finite/non-constant timestamps, scan span,
-header alignment, and reports how many timestamps are unique. With the sensor
-currently disconnected, its result is:
-`PENDING — requires PandarXT hardware`.
+header alignment, and reports how many timestamps are unique.

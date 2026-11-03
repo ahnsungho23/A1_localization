@@ -4,7 +4,7 @@
   <name>a1_lidar_bringup</name>
   <version>0.0.0</version>
   <description>PandarXT LiDAR bringup configuration and launch support for the A1 localization platform.</description>
-  <maintainer email="sungho@todo.todo">sungho</maintainer>
+  <maintainer email="ahn1023@hanyang.ac.kr">sungho</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

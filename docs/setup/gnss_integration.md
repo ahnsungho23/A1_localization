@@ -120,12 +120,11 @@ ros2 launch a1_bringup mapping.launch.py
 ros2 launch a1_bringup localization.launch.py
 ```
 
-These set `use_gnss:=true` on `a1_localization` `mola.launch.py`, which sets
-MOLA's `gnss_topic_name` to `/a1_gnss/navsat`, switches MOLA to REP-105,
-includes `gnss.launch.py` (disable with `start_gnss_driver:=false` if it runs
-separately) and starts the merger. `use_gnss` cannot be combined with
-`use_fixed_lidar_pose:=true`, because the LiDAR pose then comes from
-`vehicle_extrinsics.yaml`.
+Both include `a1_localization` `mola.launch.py`, which always runs MOLA in
+REP-105 mode with `gnss_topic_name` set to `/a1_gnss/navsat`, includes
+`gnss.launch.py` (disable with `start_gnss_driver:=false` if it runs
+separately) and starts the merger. There is no LiDAR-only mode; the LiDAR pose
+always comes from `vehicle_extrinsics.yaml` through TF.
 
 GNSS stack alone (driver, static TFs, relay):
 

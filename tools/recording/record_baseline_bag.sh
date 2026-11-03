@@ -3,9 +3,9 @@
 # Record the raw sensor topics needed for an offline baseline (C-2 / C-5).
 #
 # The base topic list is fixed. Pass -g to also record the raw Applanix driver
-# outputs (trimble_driver_ros, GPS-epoch stamps); replay them through
-# a1_gnss_bringup gnss.launch.py start_driver:=false to get UTC-stamped
-# /a1_gnss/* topics and odom->base_link.
+# outputs (trimble_driver_ros, stamped per time_source in gsof_client.yaml);
+# replay_baseline.sh needs them and replays them through a1_gnss_bringup
+# gnss.launch.py start_driver:=false to get /a1_gnss/* and odom->base_link.
 #
 # Do NOT record MOLA outputs here. The point of this bag is to be replayable
 # against any future MOLA configuration, so only raw inputs belong in it.

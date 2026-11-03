@@ -4,7 +4,7 @@
   <name>a1_bringup</name>
   <version>0.1.0</version>
   <description>Top-level A1 vehicle launch: PandarXT, Applanix GNSS/INS, MOLA mapping or localization, and the controller output.</description>
-  <maintainer email="sungho@todo.todo">sungho</maintainer>
+  <maintainer email="ahn1023@hanyang.ac.kr">sungho</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

@@ -2,8 +2,8 @@
 # y left, z up). Translations in meters, angles in degrees, applied as
 # fixed-axis roll, pitch, yaw.
 #
-# All values are null until measured: vehicle_tf.launch.py and gnss.launch.py
-# refuse to start while any value is null.
+# vehicle_tf.launch.py and gnss.launch.py refuse to start while any value is
+# null (not measured).
 #
 # base_link origin: TODO record the chosen reference point (e.g. rear axle
 # center at ground level) here when it is decided.
@@ -19,7 +19,6 @@ base_link_to_ins:
 
 base_link_to_lidar:
   # Mounted rotated +90 deg about z: LiDAR x = vehicle left, y = rear, z = up.
-  # Position not measured yet (0 = LiDAR center is the base_link origin).
   frame_id: hesai_lidar
   x: 1.16
   y: 0

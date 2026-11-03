@@ -1,8 +1,8 @@
 # Parameters for trimble_driver_ros gsof_client_node (submodule src/external/trimble_driver_ros,
 # humble branch). The node name in the launch file must stay "gsof_client".
 #
-# The device IP is intentionally empty: gnss.launch.py refuses to start until
-# it is supplied (launch argument ip:=..., or edit this file).
+# The device IP is set below; the gnss.launch.py argument ip:=... overrides it.
+# gnss.launch.py refuses to start when neither gives an IP.
 #
 # On the Applanix web interface (IO Configuration > Port Summary) enable GSOF
 # #49 (INS Full Navigation Info) AND #50 (INS RMS Info) on the TCP port below.

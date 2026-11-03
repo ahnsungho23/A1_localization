@@ -3,8 +3,8 @@
 <package format="3">
   <name>a1_localization</name>
   <version>0.1.0</version>
-  <description>LiDAR-only MOLA-LO mapping and localization integration for the A1 PandarXT.</description>
-  <maintainer email="sungho@todo.todo">sungho</maintainer>
+  <description>MOLA-LO mapping and localization launch for the A1 (PandarXT with Applanix GNSS/INS, REP-105).</description>
+  <maintainer email="ahn1023@hanyang.ac.kr">sungho</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

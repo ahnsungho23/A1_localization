@@ -3,8 +3,8 @@
 <package format="3">
   <name>a1_gnss_bringup</name>
   <version>0.0.0</version>
-  <description>Applanix POS LVX GNSS/INS bringup, vehicle extrinsics, and REP-105 odom relay for the A1 localization platform.</description>
-  <maintainer email="sungho@todo.todo">sungho</maintainer>
+  <description>Applanix POS LVX GNSS/INS bringup, vehicle extrinsics, REP-105 odom relay, and the localization merger (/localization/odom, /localization/accel) for the A1 localization platform.</description>
+  <maintainer email="ahn1023@hanyang.ac.kr">sungho</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

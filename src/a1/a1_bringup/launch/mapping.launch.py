@@ -22,6 +22,6 @@ def generate_launch_description():
     return LaunchDescription([
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(str(common_launch)),
-            launch_arguments={"mode": "mapping", "use_gnss": "true"}.items(),
+            launch_arguments={"mode": "mapping"}.items(),
         )
     ])

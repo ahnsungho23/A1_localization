@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# Replay a raw baseline bag (recorded by record_baseline_bag.sh) through MOLA.
+# Replay a raw baseline bag (recorded by record_baseline_bag.sh -g) through
+# the vehicle stack: MOLA, the GNSS relay (driver replaced by the bag) and the
+# localization merger.
 #
 #   map       Build a map from the bag (mapping mode), save it under <map-prefix>.
 #   localize  Replay the same bag against <map-prefix> in localization-only mode,
@@ -18,12 +20,22 @@
 
 set -euo pipefail
 
-readonly PKG="a1_localization"
-readonly PLAY_TOPICS=(/lidar_points /tf /tf_static)
+readonly PKG="a1_bringup"
+# Raw inputs only: vehicle static TFs and odom->base_link come from the
+# relaunched a1_gnss_bringup, not from the bag.
+readonly PLAY_TOPICS=(
+  /lidar_points
+  /gsof_client/odom
+  /gsof_client/navsat
+  /gsof_client/gsof/ins_solution_49
+  /gsof_client/gsof/ins_solution_rms_50
+)
 readonly RECORD_TOPICS=(
   /diagnostics
   /lidar_odometry/pose
   /lidar_odometry/pose_quality
+  /localization/odom
+  /localization/accel
   /mola_diagnostics/lidar_odom/status
 )
 readonly READY_TIMEOUT_S="${READY_TIMEOUT_S:-90}"
@@ -46,7 +58,7 @@ Usage:
                (default: <bag-dir>/../replay_<mode>_<timestamp>)
 
 Source ROS 2 Humble and this workspace before running. Do not run the
-LiDAR driver at the same time; the bag replaces it.
+LiDAR or Applanix driver at the same time; the bag replaces them.
 EOF
 }
 
@@ -77,8 +89,10 @@ esac
 
 bag_dir="$(cd "${bag_dir}" 2>/dev/null && pwd)" || fail "Bag directory not found"
 [[ -f "${bag_dir}/metadata.yaml" ]] || fail "Not a rosbag2 directory (no metadata.yaml): ${bag_dir}"
-grep -q "name: /lidar_points" "${bag_dir}/metadata.yaml" \
-  || fail "Bag does not contain /lidar_points: ${bag_dir}"
+for topic in "${PLAY_TOPICS[@]}"; do
+  grep -q "name: ${topic}\$" "${bag_dir}/metadata.yaml" \
+    || fail "Bag does not contain ${topic} (record with record_baseline_bag.sh -g): ${bag_dir}"
+done
 
 map_prefix="${map_prefix%.mm}"; map_prefix="${map_prefix%.simplemap}"
 if [[ "${mode}" == "localize" ]]; then
@@ -111,6 +125,7 @@ fi
 
 launch_args=(
   "start_lidar_driver:=false"
+  "start_gnss_driver:=false"
   "use_sim_time:=true"
   "rviz:=${rviz}"
   "mola_gui:=false"
@@ -126,9 +141,12 @@ else
 fi
 
 # ---------------------------------------------------------------- cleanup
-launch_pid=""; record_pid=""
+launch_pid=""; record_pid=""; gnss_pid=""
 cleanup() {
   set +e
+  if [[ -n "${gnss_pid}" ]] && kill -0 "${gnss_pid}" 2>/dev/null; then
+    kill -INT "${gnss_pid}"; wait "${gnss_pid}" 2>/dev/null
+  fi
   if [[ -n "${record_pid}" ]] && kill -0 "${record_pid}" 2>/dev/null; then
     kill -INT "${record_pid}"; wait "${record_pid}" 2>/dev/null
   fi
@@ -150,6 +168,11 @@ info "Launching ${PKG} ${launch_file} ${launch_args[*]}"
 
 # icp-logs/ is written relative to the working directory.
 cd "${out_dir}"
+# GNSS relay and vehicle TFs without the Applanix driver; the bag supplies
+# /gsof_client/*. Its stamps are interpreted with the current time_source.
+ros2 launch a1_gnss_bringup gnss.launch.py start_driver:=false use_sim_time:=true \
+  >"${out_dir}/gnss.log" 2>&1 &
+gnss_pid=$!
 ros2 launch "${PKG}" "${launch_file}" "${launch_args[@]}" >"${launch_log}" 2>&1 &
 launch_pid=$!
 

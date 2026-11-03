@@ -138,7 +138,8 @@ ros2 launch a1_bringup localization.launch.py
    ```
 
 두 launch 모두 `a1_localization` `mola.launch.py`의 다른 인자(`rviz:=false`,
-`start_lidar_driver:=false` 등)를 뒤에 붙일 수 있다.
+`start_lidar_driver:=false` 등)를 뒤에 붙일 수 있다. LiDAR만으로 실행하는 모드는
+없다. 항상 LiDAR와 GNSS/INS를 함께 사용한다.
 
 ## LiDAR 드라이버만 실행
 
@@ -160,19 +161,6 @@ Firetime correction은 LiDAR 채널별 발광 시각 오차를 보정하고, PTP
 시계를 Grandmaster와 동기화한다. Motion deskew는 한 scan 동안 차량이
 움직인 영향을 LiDAR registration twist 또는 별도 motion source로 보상하는
 처리다. 어느 하나가 나머지를 대신하지 않는다.
-
-## GNSS 없이 LiDAR만으로 실행
-
-`a1_localization`의 launch는 기본값이 `use_gnss:=false`다. 이때 GNSS 드라이버,
-merger(`/localization/*`), 차량 static TF가 실행되지 않고 MOLA가
-`map -> base_link`를 직접 발행한다. `base_link -> hesai_lidar` TF는
-`a1_gnss_bringup` `vehicle_tf.launch.py`를 따로 실행하거나
-`use_fixed_lidar_pose:=true lidar_pose:="[x,y,z,yaw,pitch,roll]"`로 준다.
-
-```zsh
-ros2 launch a1_localization mapping.launch.py
-ros2 launch a1_localization localization.launch.py map:=$(pwd)/maps/track/map
-```
 
 ## 문서
 

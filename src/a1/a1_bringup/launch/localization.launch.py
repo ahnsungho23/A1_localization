@@ -39,7 +39,6 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(str(common_launch)),
             launch_arguments={
                 "mode": "localization",
-                "use_gnss": "true",
                 "map": LaunchConfiguration("map"),
             }.items(),
         ),

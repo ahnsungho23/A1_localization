@@ -21,7 +21,7 @@ SUPPORTED_MODES = {"mapping", "localization"}
 
 
 def _load_defaults(package_share):
-    config_path = package_share / "config" / "pandarxt_lidar_only.yaml"
+    config_path = package_share / "config" / "mola.yaml"
     with config_path.open("r", encoding="utf-8") as stream:
         config = yaml.safe_load(stream)
 
@@ -37,19 +37,6 @@ def _parse_bool(name, value):
     if normalized in {"false", "0", "no", "off"}:
         return False
     raise RuntimeError(f"{name} must be true or false, got {value!r}")
-
-
-def _parse_pose(value):
-    components = [item.strip() for item in value.strip().strip("[]").split(",")]
-    if len(components) != 6 or any(not item for item in components):
-        raise RuntimeError(
-            "lidar_pose must contain [x,y,z,yaw_deg,pitch_deg,roll_deg]"
-        )
-    try:
-        [float(item) for item in components]
-    except ValueError as exc:
-        raise RuntimeError("lidar_pose components must be numeric") from exc
-    return components
 
 
 def _map_prefix(value):
@@ -82,16 +69,9 @@ def _launch_setup(context, package_share, defaults):
         "start_lidar_driver",
         LaunchConfiguration("start_lidar_driver").perform(context),
     )
-    use_fixed_pose = _parse_bool(
-        "use_fixed_lidar_pose",
-        LaunchConfiguration("use_fixed_lidar_pose").perform(context),
-    )
     publish_deskewed = _parse_bool(
         "publish_deskewed_scans",
         LaunchConfiguration("publish_deskewed_scans").perform(context),
-    )
-    use_gnss = _parse_bool(
-        "use_gnss", LaunchConfiguration("use_gnss").perform(context)
     )
     start_gnss_driver = _parse_bool(
         "start_gnss_driver",
@@ -99,24 +79,15 @@ def _launch_setup(context, package_share, defaults):
     )
     gnss_topic = LaunchConfiguration("gnss_topic").perform(context).strip()
 
-    if use_gnss:
-        if not gnss_topic:
-            raise RuntimeError("use_gnss:=true requires a non-empty gnss_topic")
-        if use_fixed_pose:
-            # a1_gnss_bringup publishes the measured base_link->hesai_lidar TF;
-            # a second, launch-argument LiDAR pose could silently disagree.
-            raise RuntimeError(
-                "use_fixed_lidar_pose cannot be combined with use_gnss: the "
-                "LiDAR pose comes from a1_gnss_bringup vehicle_extrinsics.yaml"
-            )
+    if not gnss_topic:
+        raise RuntimeError("gnss_topic must be non-empty")
 
     actions = [
         LogInfo(
             msg=(
                 f"[a1_localization] mode={mode}, input={lidar_topic} "
                 f"(expected frame={lidar_frame}), base={base_frame}, "
-                f"pipeline={pipeline}, use_gnss={use_gnss}"
-                + (f" (gnss={gnss_topic}, REP-105 map->odom)" if use_gnss else "")
+                f"pipeline={pipeline}, gnss={gnss_topic} (REP-105 map->odom)"
             )
         ),
         SetEnvironmentVariable(
@@ -138,21 +109,6 @@ def _launch_setup(context, package_share, defaults):
         SetEnvironmentVariable("MOLA_TF_FOOTPRINT_LINK", ""),
     ]
 
-    if use_fixed_pose:
-        pose = _parse_pose(LaunchConfiguration("lidar_pose").perform(context))
-        pose_names = (
-            "LIDAR_POSE_X",
-            "LIDAR_POSE_Y",
-            "LIDAR_POSE_Z",
-            "LIDAR_POSE_YAW",
-            "LIDAR_POSE_PITCH",
-            "LIDAR_POSE_ROLL",
-        )
-        actions.extend(
-            SetEnvironmentVariable(name, value)
-            for name, value in zip(pose_names, pose)
-        )
-
     if start_driver:
         lidar_launch = (
             Path(get_package_share_directory("a1_lidar_bringup"))
@@ -168,7 +124,7 @@ def _launch_setup(context, package_share, defaults):
             )
         )
 
-    if use_gnss and start_gnss_driver:
+    if start_gnss_driver:
         # Applanix driver + measured static TFs + odom->base_link relay.
         gnss_launch = (
             Path(get_package_share_directory("a1_gnss_bringup"))
@@ -188,20 +144,19 @@ def _launch_setup(context, package_share, defaults):
             )
         )
 
-    if use_gnss:
-        # Controller output: LO pose + GNSS velocity/acceleration at the LO
-        # rate (/localization/odom, /localization/accel).
-        actions.append(
-            Node(
-                package="a1_gnss_bringup",
-                executable="localization_odom_merger.py",
-                name="localization_odom_merger",
-                parameters=[{"use_sim_time": _parse_bool(
-                    "use_sim_time",
-                    LaunchConfiguration("use_sim_time").perform(context))}],
-                output="screen",
-            )
+    # Controller output at the GNSS rate (~100 Hz): /localization/odom,
+    # /localization/accel.
+    actions.append(
+        Node(
+            package="a1_gnss_bringup",
+            executable="localization_odom_merger.py",
+            name="localization_odom_merger",
+            parameters=[{"use_sim_time": _parse_bool(
+                "use_sim_time",
+                LaunchConfiguration("use_sim_time").perform(context))}],
+            output="screen",
         )
+    )
 
     is_mapping = mode == "mapping"
     mola_arguments = {
@@ -215,21 +170,21 @@ def _launch_setup(context, package_share, defaults):
         "mola_bridge_odometry_frame": "odom",
         "mola_lo_pipeline": str(pipeline),
         "mola_deskew_method": str(defaults["deskew_method"]),
-        "ignore_lidar_pose_from_tf": str(use_fixed_pose),
+        "ignore_lidar_pose_from_tf": "False",
         "use_imu_for_lio": "False",
         "imu_gravity_correction": "False",
         "imu_topic_name": "",
         # GNSS is only recorded into the simplemap (for offline
         # georeferencing); LO does not use it for pose estimation.
-        "gnss_topic_name": gnss_topic if use_gnss else "",
+        "gnss_topic_name": gnss_topic,
         "gpsfix_topic_name": "",
         "gnss_mode": "none",
         "forward_ros_tf_odom_to_mola": "False",
         "odom_topic_name": "",
         "use_state_estimator": "False",
-        # With GNSS the relay owns odom->base_link, so MOLA must publish
-        # map->odom; otherwise base_link would get two parents.
-        "publish_localization_following_rep105": str(use_gnss),
+        # The relay owns odom->base_link, so MOLA must publish map->odom;
+        # otherwise base_link would get two parents.
+        "publish_localization_following_rep105": "True",
         "start_mapping_enabled": str(is_mapping),
         "start_active": str(is_mapping),
         "generate_simplemap": str(is_mapping),
@@ -354,34 +309,14 @@ def generate_launch_description():
             description="Hesai: 0=LiDAR/PTP time, 1=host receive time",
         ),
         DeclareLaunchArgument(
-            "use_fixed_lidar_pose",
-            default_value="false",
-            description=(
-                "Use lidar_pose instead of looking up base_frame->lidar_frame in TF"
-            ),
-        ),
-        DeclareLaunchArgument(
-            "lidar_pose",
-            default_value="[0,0,0,0,0,0]",
-            description="[x,y,z,yaw_deg,pitch_deg,roll_deg]; opt-in only",
-        ),
-        DeclareLaunchArgument(
             "publish_deskewed_scans",
             default_value=str(defaults["publish_deskewed_scans"]).lower(),
-        ),
-        DeclareLaunchArgument(
-            "use_gnss",
-            default_value=str(defaults["use_gnss"]).lower(),
-            description=(
-                "Applanix GNSS/INS: record NavSatFix into the simplemap and "
-                "publish REP-105 map->odom (odom->base_link from a1_gnss_bringup)"
-            ),
         ),
         DeclareLaunchArgument(
             "start_gnss_driver",
             default_value="true",
             description=(
-                "With use_gnss: include a1_gnss_bringup gnss.launch.py "
+                "Include a1_gnss_bringup gnss.launch.py "
                 "(false when it is launched separately)"
             ),
         ),

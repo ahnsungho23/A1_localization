@@ -21,7 +21,7 @@ Applanix ──▶ gsof_client ──/gsof_client/odom, navsat, gsof/ins_solutio
   위치는 LO를 그대로 쓰고 속도는 0으로 낸다(stationary hold). 필드 정의는
   [controller_interface.md](controller_interface.md).
 
-## 좌표계 (REP-105, `use_gnss:=true`)
+## 좌표계 (REP-105)
 
 ```text
 map ──[MOLA bridge]──▶ odom ──[gnss_odom_relay]──▶ base_link ──[static]──▶ ins
@@ -43,14 +43,14 @@ map ──[MOLA bridge]──▶ odom ──[gnss_odom_relay]──▶ base_link
 ## Launch 구성
 
 ```text
-a1_bringup/mapping.launch.py, localization.launch.py   (mode, use_gnss:=true, map)
+a1_bringup/mapping.launch.py, localization.launch.py   (mode, map)
 └── a1_localization/mola.launch.py
     ├── a1_lidar_bringup/pandarxt.launch.py            (start_lidar_driver)
     ├── a1_gnss_bringup/gnss.launch.py                 (start_gnss_driver)
     │   ├── gsof_client (Applanix 드라이버)
     │   ├── static TF: base_link→ins, base_link→hesai_lidar
     │   └── gnss_odom_relay
-    ├── localization_odom_merger                      (use_gnss일 때)
+    ├── localization_odom_merger
     └── mola_lidar_odometry ros2-lidar-odometry.launch.py
 ```
 

@@ -24,11 +24,6 @@ start_active = false
 Thus incoming scans cannot modify the prebuilt map, and matching does not
 begin before an initial pose is supplied.
 
-Without GNSS, `ros2 launch a1_localization localization.launch.py map:=...`
-starts only LiDAR and MOLA (`use_gnss:=false`): no Applanix driver, no merger
-and no vehicle static TF. The `base_link -> hesai_lidar` TF must then come from
-`a1_gnss_bringup` `vehicle_tf.launch.py` or `use_fixed_lidar_pose:=true`.
-
 ## Set the initial pose and activate
 
 In RViz, select **2D Pose Estimate** and publish a rough pose on
@@ -58,13 +53,13 @@ MOLA outputs:
 | `/lidar_odometry/pose` | `nav_msgs/msg/Odometry` | `header.frame_id=map`, `child_frame_id=base_link`, pose and 6x6 pose covariance, ~10 Hz |
 | `/lidar_odometry/pose_quality` | `std_msgs/msg/Float32` | ICP quality of the pose just published |
 | `/lidar_odometry/localmap_points` | `sensor_msgs/msg/PointCloud2` | loaded `localmap` metric-map layer |
-| `/tf` | `tf2_msgs/msg/TFMessage` | with GNSS (REP-105): `map -> odom`; without GNSS: `map -> base_link` |
+| `/tf` | `tf2_msgs/msg/TFMessage` | `map -> odom` (REP-105) |
 | `/diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | input freshness, ICP quality, timing, map, and aggregate status |
 
 MOLA fills pose and pose covariance only; the twist of `/lidar_odometry/pose`
 is always zero and must not be read as a measured zero velocity.
 
-Controller outputs, with GNSS only (`localization_odom_merger`, ~100 Hz):
+Controller outputs (`localization_odom_merger`, ~100 Hz):
 
 | Output | Type | Contract |
 | --- | --- | --- |

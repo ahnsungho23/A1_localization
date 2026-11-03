@@ -85,7 +85,7 @@ Do not enable it with zero values unless that is the measured mounting pose.
 With the driver running, inspect one full cloud:
 
 ```zsh
-./scripts/check_pandarxt_pointcloud.py \
+./tools/analysis/check_pandarxt_pointcloud.py \
   --topic /lidar_points \
   --expected-frame hesai_lidar
 ```

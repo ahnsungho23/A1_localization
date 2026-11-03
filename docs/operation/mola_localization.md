@@ -7,7 +7,7 @@ Supply the map prefix or its `.mm` filename:
 ```zsh
 source /opt/ros/humble/setup.zsh
 source install/setup.zsh
-ros2 launch a1_mola_localization localization.launch.py \
+ros2 launch a1_localization localization.launch.py \
   map:=$(pwd)/maps/track/map
 ```
 

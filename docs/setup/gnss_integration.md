@@ -17,7 +17,7 @@ map ──[MOLA bridge]──▶ odom ──[gnss_odom_relay]──▶ base_link
 
 ## Driver
 
-`src/trimble_driver_ros` is the `trimble-oss/trimble_driver_ros` submodule,
+`src/external/trimble_driver_ros` is the `trimble-oss/trimble_driver_ros` submodule,
 pinned to the `humble` branch. Its parameters are not edited in place;
 `a1_gnss_bringup/config/gsof_client.yaml` overrides them:
 
@@ -48,7 +48,7 @@ to start while any value is null.
 ## Time
 
 The host clock follows the TM2000A through ptp4l
-([system/ptp4l-slave.conf](../system/ptp4l-slave.conf)). With
+([tools/host/ptp4l-slave.conf](../../tools/host/ptp4l-slave.conf)). With
 `time_source: gps` the driver stamps GPS time counted from 1980-01-06, so
 `gnss_odom_relay` converts every output stamp:
 
@@ -76,10 +76,10 @@ replay recorded `/gsof_client/*` topics through the relay.
 Mapping or localization with GNSS:
 
 ```zsh
-ros2 launch a1_mola_localization mapping.launch.py \
+ros2 launch a1_localization mapping.launch.py \
   use_gnss:=true gnss_ip:=<applanix-ip> timestamp_type:=0
 
-ros2 launch a1_mola_localization localization.launch.py \
+ros2 launch a1_localization localization.launch.py \
   use_gnss:=true gnss_ip:=<applanix-ip> timestamp_type:=0 \
   map:=$(pwd)/maps/track/map
 ```

@@ -1,13 +1,16 @@
 [submodule "src/HesaiLidar_ROS_2.0"]
-	path = src/HesaiLidar_ROS_2.0
+	path = src/external/HesaiLidar_ROS_2.0
 	url = https://github.com/HesaiTechnology/HesaiLidar_ROS_2.0.git
 [submodule "src/mola_lidar_odometry"]
-	path = src/mola_lidar_odometry
+	path = src/external/mola_lidar_odometry
 	url = https://github.com/MOLAorg/mola_lidar_odometry.git
 [submodule "src/mp2p_icp"]
-	path = src/mp2p_icp
+	path = src/external/mp2p_icp
 	url = https://github.com/MOLAorg/mp2p_icp.git
 [submodule "src/trimble_driver_ros"]
-	path = src/trimble_driver_ros
+	path = src/external/trimble_driver_ros
 	url = https://github.com/trimble-oss/trimble_driver_ros.git
 	branch = humble
+[submodule "src/external/vendor/mola"]
+	path = src/external/vendor/mola
+	url = https://github.com/MOLAorg/mola.git

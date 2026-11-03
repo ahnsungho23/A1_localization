@@ -1,3 +1,9 @@
+"""Vehicle mapping: PandarXT + Applanix + MOLA mapping + /localization/* output.
+
+Any a1_localization mola.launch.py argument can be appended, e.g.
+map_output_path:=<prefix> or rviz:=false.
+"""
+
 from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
@@ -8,7 +14,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     common_launch = (
-        Path(get_package_share_directory("a1_mola_localization"))
+        Path(get_package_share_directory("a1_localization"))
         / "launch"
         / "mola.launch.py"
     )
@@ -16,6 +22,6 @@ def generate_launch_description():
     return LaunchDescription([
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(str(common_launch)),
-            launch_arguments={"mode": "mapping"}.items(),
+            launch_arguments={"mode": "mapping", "use_gnss": "true"}.items(),
         )
     ])

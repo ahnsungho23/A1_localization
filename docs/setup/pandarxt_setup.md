@@ -45,7 +45,7 @@ pipeline은 LiDAR registration twist로 deskew한다. 향후 별도 fusion 단�
 호스트 설정은 LiDAR 내부가 아니라 **LiDAR UDP 데이터를 수신하는 각 PC**에 적용한다. 저장소 루트에서 다음을 실행한다. `eno1`은 예시이므로 실제 Ethernet 인터페이스명으로 바꾼다.
 
 ```bash
-sudo ./scripts/setup_lidar_host.sh eno1
+sudo ./tools/host/setup_lidar_host.sh eno1
 ```
 
 스크립트의 기본값은 다음과 같다.
@@ -60,12 +60,12 @@ sudo ./scripts/setup_lidar_host.sh eno1
 
 connection 이름은 필요한 경우 `LIDAR_CONNECTION_NAME` 환경 변수로 바꿀 수 있다. 스크립트는 대상 연결을 다시 올리므로 Ethernet 연결이 잠시 끊길 수 있다. 특히 현재 SSH 세션이 그 인터페이스를 사용한다면 세션이 종료될 수 있다.
 
-`system/90-hesai-lidar.conf`는 각 수신 호스트의 `/etc/sysctl.d/90-hesai-lidar.conf`에 설치된다. Linux는 `SO_RCVBUF`에 설정한 값을 내부 bookkeeping 공간까지 포함해 두 배로 표시할 수 있다. 따라서 드라이버가 `67108864 bytes`를 표시하는 것은 `33554432` 요청값에 대한 정상 동작이며, LiDAR 내부 메모리 설정을 뜻하지 않는다.
+`tools/host/90-hesai-lidar.conf`는 각 수신 호스트의 `/etc/sysctl.d/90-hesai-lidar.conf`에 설치된다. Linux는 `SO_RCVBUF`에 설정한 값을 내부 bookkeeping 공간까지 포함해 두 배로 표시할 수 있다. 따라서 드라이버가 `67108864 bytes`를 표시하는 것은 `33554432` 요청값에 대한 정상 동작이며, LiDAR 내부 메모리 설정을 뜻하지 않는다.
 
 Destination IP가 broadcast이므로 PC를 한 번에 한 대만 연결한다면 각 PC에서 기본 `.100` 주소를 재사용할 수 있다. 여러 PC를 같은 센서 네트워크에 동시에 연결할 때는 주소 충돌을 피하도록 각 호스트에 서로 다른 `192.168.1.X/24` 주소를 설정해야 한다.
 
 ```bash
-sudo ./scripts/setup_lidar_host.sh enp3s0 192.168.1.101/24
+sudo ./tools/host/setup_lidar_host.sh enp3s0 192.168.1.101/24
 ```
 
 ## 시간 동기화
@@ -104,7 +104,7 @@ per-point timestamp와 LiDAR registration에서 추정한 twist 또는 별도의
 ROS 2 Humble과 workspace를 source하고 드라이버를 실행한 상태에서 read-only 검증을 수행한다.
 
 ```bash
-./scripts/verify_lidar.sh eno1
+./tools/analysis/verify_lidar.sh eno1
 ```
 
 스크립트는 인터페이스, receive buffer, ping, `/lidar_points`, PointCloud2 header/width/point step/fields, `/lidar_packets_loss`, 커널 UDP 오류 카운터를 확인한다. Discovery와 실제 메시지 수신에는 timeout과 재시도를 적용하며 ROS daemon은 변경하지 않는다.

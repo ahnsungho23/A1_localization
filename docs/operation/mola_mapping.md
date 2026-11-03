@@ -4,7 +4,7 @@
 
 Build and source the workspace, configure the PandarXT host network, and make
 sure the calibrated `base_link -> hesai_lidar` TF is owned by the robot model.
-See [PandarXT to MOLA-LO interface](pandarxt_mola_interface.md) before using a
+See [PandarXT to MOLA-LO interface](../setup/pandarxt_mola_interface.md) before using a
 fixed pose.
 
 ## Start mapping
@@ -14,7 +14,7 @@ The default command includes the existing PandarXT launch, MOLA-LO, and RViz:
 ```zsh
 source /opt/ros/humble/setup.zsh
 source install/setup.zsh
-ros2 launch a1_mola_localization mapping.launch.py
+ros2 launch a1_localization mapping.launch.py
 ```
 
 The project defaults are `mola_gui:=false` and `rviz:=true`. Mapping,
@@ -25,14 +25,14 @@ The default map prefix is
 `<workspace>/maps/track/map`. To choose another prefix:
 
 ```zsh
-ros2 launch a1_mola_localization mapping.launch.py \
+ros2 launch a1_localization mapping.launch.py \
   map_output_path:=${HOME}/a1_maps/track/map
 ```
 
 If the PandarXT driver is already running, prevent a duplicate driver:
 
 ```zsh
-ros2 launch a1_mola_localization mapping.launch.py \
+ros2 launch a1_localization mapping.launch.py \
   start_lidar_driver:=false
 ```
 

@@ -85,7 +85,7 @@ if ! grep -qx "/lidar_points" <<<"${live_topics}"; then
 fi
 if ! grep -qx "/lidar_ptp" <<<"${live_topics}"; then
   warn "/lidar_ptp is not published. Enable ros_send_ptp_topic in" \
-       "src/a1_lidar_bringup/config/pandarxt.yaml.in if PTP lock status is wanted."
+       "src/a1/a1_lidar_bringup/config/pandarxt.yaml.in if PTP lock status is wanted."
 fi
 for t in "${extra_topics[@]}"; do
   if ! grep -qx "${t}" <<<"${live_topics}"; then

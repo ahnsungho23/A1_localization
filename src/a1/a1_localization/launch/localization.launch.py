@@ -8,7 +8,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     common_launch = (
-        Path(get_package_share_directory("a1_mola_localization"))
+        Path(get_package_share_directory("a1_localization"))
         / "launch"
         / "mola.launch.py"
     )

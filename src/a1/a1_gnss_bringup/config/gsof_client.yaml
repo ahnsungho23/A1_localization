@@ -1,4 +1,4 @@
-# Parameters for trimble_driver_ros gsof_client_node (submodule src/trimble_driver_ros,
+# Parameters for trimble_driver_ros gsof_client_node (submodule src/external/trimble_driver_ros,
 # humble branch). The node name in the launch file must stay "gsof_client".
 #
 # The device IP is intentionally empty: gnss.launch.py refuses to start until

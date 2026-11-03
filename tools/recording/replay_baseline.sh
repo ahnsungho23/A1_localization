@@ -8,17 +8,17 @@
 #             (avg_ms, utilization_pct, dropped_frames_ratio, quality).
 #
 # Typical C-3 sequence:
-#   ./scripts/replay_baseline.sh map      <bag-dir> ~/a1_maps/<date>/map
-#   ./scripts/replay_baseline.sh localize <bag-dir> ~/a1_maps/<date>/map            # timing run, rviz off
-#   ./scripts/replay_baseline.sh localize <bag-dir> ~/a1_maps/<date>/map --rviz     # timing run, rviz on
-#   ./scripts/replay_baseline.sh localize <bag-dir> ~/a1_maps/<date>/map --icp-logs # quality run
+#   ./tools/recording/replay_baseline.sh map      <bag-dir> ~/a1_maps/<date>/map
+#   ./tools/recording/replay_baseline.sh localize <bag-dir> ~/a1_maps/<date>/map            # timing run, rviz off
+#   ./tools/recording/replay_baseline.sh localize <bag-dir> ~/a1_maps/<date>/map --rviz     # timing run, rviz on
+#   ./tools/recording/replay_baseline.sh localize <bag-dir> ~/a1_maps/<date>/map --icp-logs # quality run
 #
 # Timing numbers are only meaningful on the vehicle PC. Quality numbers
 # (--icp-logs) do not depend on the machine.
 
 set -euo pipefail
 
-readonly PKG="a1_mola_localization"
+readonly PKG="a1_localization"
 readonly PLAY_TOPICS=(/lidar_points /tf /tf_static)
 readonly RECORD_TOPICS=(
   /diagnostics

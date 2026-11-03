@@ -61,16 +61,16 @@ git submodule update --init --recursive
 다음 명령은 LiDAR UDP를 수신하는 **각 호스트 PC**에서 실행한다. `eno1`은 예시이므로 실제 Ethernet 인터페이스명으로 바꾼다. 대상 연결을 올리는 동안 Ethernet이 잠시 끊길 수 있으며, 해당 인터페이스를 사용하는 SSH 세션도 종료될 수 있다.
 
 ```bash
-sudo ./scripts/setup_lidar_host.sh eno1
+sudo ./tools/host/setup_lidar_host.sh eno1
 ```
 
 기본 호스트 주소는 `192.168.1.100/24`다. 여러 PC를 센서 네트워크에 동시에 연결한다면 각 호스트에 서로 다른 주소를 지정한다.
 
 ```bash
-sudo ./scripts/setup_lidar_host.sh enp3s0 192.168.1.101/24
+sudo ./tools/host/setup_lidar_host.sh enp3s0 192.168.1.101/24
 ```
 
-LiDAR 내부 설정, PTP 조건 및 receive-buffer 해석은 [PandarXT setup reference](docs/pandarxt_setup.md)를 참고한다.
+LiDAR 내부 설정, PTP 조건 및 receive-buffer 해석은 [PandarXT setup reference](docs/setup/pandarxt_setup.md)를 참고한다.
 
 ## 의존성 설치와 빌드
 
@@ -102,36 +102,53 @@ Firetime correction은 LiDAR 채널별 발광 시각 오차를 보정하고, PTP
 움직인 영향을 LiDAR registration twist 또는 별도 motion source로 보상하는
 처리다. 어느 하나가 나머지를 대신하지 않는다.
 
+## 차량 실행 (최상위 launch)
+
+LiDAR 드라이버, Applanix GNSS/INS, 차량 TF, MOLA, `/localization/*` 출력을
+한 번에 실행한다.
+
+```zsh
+# mapping: 기본 출력 <workspace>/maps/track/map(.mm, .simplemap)
+ros2 launch a1_bringup mapping.launch.py
+
+# 위치 추정: 기본 지도 <workspace>/maps/track/map
+ros2 launch a1_bringup localization.launch.py
+```
+
+다른 지도는 `map:=<prefix 또는 .mm 경로>`로 지정한다. `a1_localization`
+`mola.launch.py`의 다른 인자(`rviz:=false`, `map_output_path:=...` 등)도 뒤에
+붙일 수 있다. 제어기 출력 형식은
+[controller interface](docs/controller_interface.md)를 따른다.
+
 ## MOLA-LO mapping 및 localization
 
 LiDAR-only mapping은 기존 PandarXT launch를 include한다.
 
 ```zsh
-ros2 launch a1_mola_localization mapping.launch.py
+ros2 launch a1_localization mapping.launch.py
 ```
 
 저장한 MOLA map prefix로 localization-only mode를 실행한다.
 
 ```zsh
-ros2 launch a1_mola_localization localization.launch.py \
+ros2 launch a1_localization localization.launch.py \
   map:=$(pwd)/maps/track/map
 ```
 
 자세한 설치, interface, map 저장, initial pose, output 및 검증 경계는 다음
 문서를 따른다.
 
-- [MOLA-LO installation](docs/mola_installation.md)
-- [PandarXT to MOLA-LO interface](docs/pandarxt_mola_interface.md)
-- [LiDAR-only mapping](docs/mola_mapping.md)
-- [Map-based LiDAR localization](docs/mola_localization.md)
-- [Applanix GNSS/INS integration (REP-105)](docs/gnss_integration.md)
-- [Verification record](docs/verification.md)
+- [MOLA-LO installation](docs/setup/mola_installation.md)
+- [PandarXT to MOLA-LO interface](docs/setup/pandarxt_mola_interface.md)
+- [LiDAR-only mapping](docs/operation/mola_mapping.md)
+- [Map-based LiDAR localization](docs/operation/mola_localization.md)
+- [Applanix GNSS/INS integration (REP-105)](docs/setup/gnss_integration.md)
 
 Applanix GNSS/INS를 결합할 때는 `use_gnss:=true`를 추가한다. 이때 MOLA는
 REP-105(`map -> odom`)로 발행하고, `odom -> base_link`는
 `a1_gnss_bringup`의 relay가 발행한다. 실측 extrinsics와 장비 IP가 없으면
 launch가 시작을 거부한다. 자세한 내용은
-[GNSS integration](docs/gnss_integration.md)을 따른다.
+[GNSS integration](docs/setup/gnss_integration.md)을 따른다.
 
 ## Read-only 검증
 
@@ -140,7 +157,7 @@ launch가 시작을 거부한다. 자세한 내용은
 ```zsh
 source /opt/ros/humble/setup.zsh
 source install/setup.zsh
-./scripts/verify_lidar.sh eno1
+./tools/analysis/verify_lidar.sh eno1
 ```
 
 검증 스크립트는 네트워크 설정이나 ROS daemon 상태를 변경하지 않으며, discovery와 메시지 수신을 timeout 및 재시도로 제한한다. 핵심 성공 조건은 explicit type으로 실제 PointCloud2 메시지를 받는 것이다. header, width `128000`, point step `26`, field schema와 packet loss를 함께 확인한다. `ros2 topic echo`의 `A message was lost` 경고 자체는 센서 UDP 손실로 판정하지 않는다. 대용량 PointCloud2에서는 `ros2 topic hz`의 CLI subscriber가 실제 처리율을 낮게 표시할 수 있으므로 이 값만으로 센서 손실을 판단하지 않는다. `ros2 param get` 응답 여부도 성공 기준이 아니다.
@@ -159,28 +176,39 @@ ros2 daemon start
 ```text
 .
 ├── docs/
-│   ├── gnss_integration.md      # Applanix 드라이버, extrinsics, 시각 변환, REP-105
-│   ├── mola_installation.md     # MOLA source/dependency/build 기준
-│   ├── mola_localization.md     # map load, initial pose, output interface
-│   ├── mola_mapping.md          # mapping 및 map 저장 workflow
-│   ├── pandarxt_mola_interface.md # PointCloud2/deskew/TF contract
-│   ├── pandarxt_setup.md        # LiDAR/host/PTP 설정 기준
-│   └── verification.md          # static 결과와 hardware PENDING 경계
-├── scripts/
-│   ├── check_pandarxt_pointcloud.py # field/timestamp live diagnostic
-│   ├── record_baseline_bag.sh   # 오프라인 baseline용 raw topic 녹화
-│   ├── replay_baseline.sh       # baseline bag을 MOLA mapping/localization에 재생
-│   ├── setup_lidar_host.sh      # 호스트 NetworkManager/sysctl 설정
-│   └── verify_lidar.sh          # read-only LiDAR/ROS 검증
-├── system/
-│   ├── 90-hesai-lidar.conf      # 호스트 UDP receive-buffer 설정
-│   └── ptp4l-slave.conf         # TM2000A PTP slave 설정
+│   ├── architecture.md              # 데이터 흐름, 좌표계, 노드/토픽 요약
+│   ├── controller_interface.md      # 제어기가 받는 /localization/* 필드 정의
+│   ├── setup/
+│   │   ├── gnss_integration.md      # Applanix 드라이버, extrinsics, 시각 변환, REP-105
+│   │   ├── mola_installation.md     # MOLA source/dependency/build 기준
+│   │   ├── pandarxt_mola_interface.md # PointCloud2/deskew/TF contract
+│   │   └── pandarxt_setup.md        # LiDAR/host/PTP 설정 기준
+│   └── operation/
+│       ├── mola_localization.md     # map load, initial pose, output interface
+│       └── mola_mapping.md          # mapping 및 map 저장 workflow
+├── tools/
+│   ├── host/
+│   │   ├── setup_lidar_host.sh      # 호스트 NetworkManager/sysctl 설정
+│   │   ├── 90-hesai-lidar.conf      # 호스트 UDP receive-buffer 설정
+│   │   └── ptp4l-slave.conf         # TM2000A PTP slave 설정
+│   ├── recording/
+│   │   ├── record_baseline_bag.sh   # 오프라인 baseline용 raw topic 녹화
+│   │   └── replay_baseline.sh       # baseline bag을 MOLA mapping/localization에 재생
+│   └── analysis/
+│       ├── check_pandarxt_pointcloud.py # field/timestamp live diagnostic
+│       └── verify_lidar.sh          # read-only LiDAR/ROS 검증
+├── maps/                            # MOLA map 출력 (git 제외)
 └── src/
-    ├── HesaiLidar_ROS_2.0/      # Git submodule
-    ├── a1_gnss_bringup/         # Applanix launch/config, extrinsics, odom relay
-    ├── a1_lidar_bringup/        # PandarXT launch/config/calibration
-    ├── a1_mola_localization/    # project-owned MOLA overlay
-    ├── mola_lidar_odometry/     # official pinned Git submodule
-    ├── mp2p_icp/                # official pinned Git submodule
-    └── trimble_driver_ros/      # Git submodule (humble branch)
+    ├── a1/                          # 프로젝트 코드
+    │   ├── a1_bringup/              # 최상위 launch (mapping, localization)
+    │   ├── a1_gnss_bringup/         # Applanix launch/config, extrinsics, odom relay, merger
+    │   ├── a1_lidar_bringup/        # PandarXT launch/config/calibration
+    │   └── a1_localization/         # MOLA launch/config
+    └── external/                    # 외부 코드 (Git submodule, 직접 수정하지 않음)
+        ├── HesaiLidar_ROS_2.0/
+        ├── mola_lidar_odometry/     # pinned 3.0.0
+        ├── mola_metric_maps -> vendor/mola/mola_metric_maps
+        ├── mp2p_icp/
+        ├── trimble_driver_ros/      # humble branch
+        └── vendor/mola/             # MOLA 3.1.1 (mola_metric_maps만 빌드)
 ```

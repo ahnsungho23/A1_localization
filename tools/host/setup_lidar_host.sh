@@ -81,9 +81,7 @@ fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
-REPOSITORY_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-readonly REPOSITORY_ROOT
-readonly SYSCTL_SOURCE="${REPOSITORY_ROOT}/system/${SYSCTL_FILENAME}"
+readonly SYSCTL_SOURCE="${SCRIPT_DIR}/${SYSCTL_FILENAME}"
 readonly SYSCTL_TARGET="/etc/sysctl.d/${SYSCTL_FILENAME}"
 
 if [[ ! -f "${SYSCTL_SOURCE}" ]]; then

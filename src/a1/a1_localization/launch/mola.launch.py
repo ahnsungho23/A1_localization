@@ -16,7 +16,7 @@ from launch_ros.actions import Node, SetRemap
 import yaml
 
 
-PACKAGE_NAME = "a1_mola_localization"
+PACKAGE_NAME = "a1_localization"
 SUPPORTED_MODES = {"mapping", "localization"}
 
 
@@ -113,7 +113,7 @@ def _launch_setup(context, package_share, defaults):
     actions = [
         LogInfo(
             msg=(
-                f"[a1_mola_localization] mode={mode}, input={lidar_topic} "
+                f"[a1_localization] mode={mode}, input={lidar_topic} "
                 f"(expected frame={lidar_frame}), base={base_frame}, "
                 f"pipeline={pipeline}, use_gnss={use_gnss}"
                 + (f" (gnss={gnss_topic}, REP-105 map->odom)" if use_gnss else "")
@@ -245,7 +245,7 @@ def _launch_setup(context, package_share, defaults):
         output_prefix.parent.mkdir(parents=True, exist_ok=True)
         actions.extend([
             LogInfo(
-                msg=f"[a1_mola_localization] map prefix: {output_prefix}"
+                msg=f"[a1_localization] map prefix: {output_prefix}"
             ),
             SetEnvironmentVariable("MOLA_SAVE_MM", f"{output_prefix}.mm"),
             SetEnvironmentVariable(
@@ -267,7 +267,7 @@ def _launch_setup(context, package_share, defaults):
         actions.append(
             LogInfo(
                 msg=(
-                    f"[a1_mola_localization] localization map: {mm_file}; "
+                    f"[a1_localization] localization map: {mm_file}; "
                     "mapping is disabled and MOLA starts inactive"
                 )
             )
@@ -323,8 +323,8 @@ def generate_launch_description():
 
     # With --symlink-install this file resolves into <workspace>/src, so maps
     # go to <workspace>/maps/track/map; otherwise fall back to ~/.ros.
-    workspace = Path(__file__).resolve().parents[3]
-    if (workspace / "src" / "a1_mola_localization").is_dir():
+    workspace = Path(__file__).resolve().parents[4]
+    if (workspace / "src" / "a1" / PACKAGE_NAME).is_dir():
         default_map_dir = workspace / "maps"
     else:
         default_map_dir = Path.home() / ".ros" / "a1_localization" / "maps"

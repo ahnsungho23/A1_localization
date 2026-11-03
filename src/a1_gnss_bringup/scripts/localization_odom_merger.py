@@ -19,6 +19,8 @@ Outputs (one message each per GNSS sample, same header.stamp):
     pose.covariance   from the last accepted LO pose
     twist             linear.x / y and angular.z of this GNSS sample; the rest 0
                       (all 0 during a stationary hold)
+    twist.angular.x   NOT a rate: heading of base_link in degrees, from the map
+                      x axis, CCW positive, (-180, 180] (controller interface)
   /localization/accel   geometry_msgs/AccelWithCovarianceStamped, frame base_link
     accel.linear.x / y   mean of the GNSS samples in the last accel_window_sec
 
@@ -119,6 +121,12 @@ def quat_slerp(q0, q1, s):
 
 def quat_angle(q):
     return 2.0 * math.acos(min(1.0, abs(q[3])))
+
+
+def heading_deg(q):
+    """Yaw of q about z in degrees, from the parent x axis, CCW positive, (-180, 180]."""
+    x, y, z, w = q
+    return math.degrees(math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z)))
 
 
 def pose_compose(a, b):
@@ -468,6 +476,8 @@ class LocalizationOdomMerger(Node):
             out.twist.twist.linear.x = twist.linear.x
             out.twist.twist.linear.y = twist.linear.y
             out.twist.twist.angular.z = twist.angular.z
+        # Not a rate: controller interface carries the heading here.
+        out.twist.twist.angular.x = heading_deg(pose[1])
         out.twist.covariance = self.twist_covariance
 
         accel = AccelWithCovarianceStamped()

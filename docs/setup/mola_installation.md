@@ -46,12 +46,21 @@ If the repository was cloned without submodules:
 git submodule update --init --recursive
 ```
 
-The dependency split is intentional:
+The dependency split:
 
-- source-pinned: `mola_lidar_odometry`
-- ROS binaries resolved by rosdep: MOLA core, ROS 2 bridge, launcher,
-  visualization, state-estimation support, MRPT, and mp2p_icp
-- project-owned overlay: `a1_localization`
+| Source | Packages |
+| --- | --- |
+| Built from `src/external` (overrides apt) | `mola_lidar_odometry` 3.0.0, `mp2p_icp` 2.10.3, `mola_metric_maps` 3.1.1 |
+| ROS binaries resolved by rosdep | MOLA core, ROS 2 bridge, launcher, visualization, state-estimation support, georeferencing, MRPT |
+| Project packages | `src/a1/*` (`a1_localization` holds the MOLA launch and settings) |
+
+A workspace package overrides the apt package of the same name.
+
+- `mp2p_icp`: apt has 2.12.0, but the workspace builds the 2.10.3 submodule.
+  The apt copy cannot be removed, because `mola-metric-maps`,
+  `mola-georeferencing` and `mola-relocalization` depend on it.
+- `mola_lidar_odometry`: the apt 3.0.0 copy is unused and nothing depends on
+  it; it can be removed with `sudo apt remove ros-humble-mola-lidar-odometry`.
 
 ## Build
 
@@ -65,7 +74,8 @@ Confirm the selected versions:
 
 ```zsh
 git submodule status --recursive
-ros2 pkg prefix mola_lidar_odometry
+ros2 pkg prefix mola_lidar_odometry   # <workspace>/install/...
+ros2 pkg prefix mola_metric_maps      # <workspace>/install/...
 ros2 pkg prefix a1_localization
 ```
 

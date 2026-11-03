@@ -1,19 +1,20 @@
-# Map-based LiDAR localization
+# Map-based localization
 
-## Start localization-only mode
+## Start localization
 
-Supply the map prefix or its `.mm` filename:
+On the vehicle, start LiDAR, Applanix GNSS/INS, vehicle TF, MOLA, the merger
+and RViz together:
 
 ```zsh
 source /opt/ros/humble/setup.zsh
 source install/setup.zsh
-ros2 launch a1_localization localization.launch.py \
-  map:=$(pwd)/maps/track/map
+ros2 launch a1_bringup localization.launch.py
 ```
 
-The launch refuses to start without the `.mm` file. It passes the metric map
-and, when present, the matching `.simplemap` to MOLA. It passes these upstream
-launch arguments:
+The default map is `<workspace>/maps/track/map`; use
+`map:=<map prefix or .mm path>` for another one. The launch refuses to start
+without the `.mm` file. It passes the metric map and, when present, the
+matching `.simplemap` to MOLA, with these upstream launch arguments:
 
 ```text
 start_mapping_enabled = false
@@ -23,13 +24,19 @@ start_active = false
 Thus incoming scans cannot modify the prebuilt map, and matching does not
 begin before an initial pose is supplied.
 
+Without GNSS, `ros2 launch a1_localization localization.launch.py map:=...`
+starts only LiDAR and MOLA (`use_gnss:=false`): no Applanix driver, no merger
+and no vehicle static TF. The `base_link -> hesai_lidar` TF must then come from
+`a1_gnss_bringup` `vehicle_tf.launch.py` or `use_fixed_lidar_pose:=true`.
+
 ## Set the initial pose and activate
 
 In RViz, select **2D Pose Estimate** and publish a rough pose on
 `/initialpose`. This is MOLA's official
 `geometry_msgs/msg/PoseWithCovarianceStamped` relocalization input.
 Alternatively, a caller can use `/relocalize_near_pose` with
-`mola_msgs/srv/RelocalizeNearPose`.
+`mola_msgs/srv/RelocalizeNearPose`. Keep the heading error small: in tests a
+yaw error above about 5° kept a single ICP attempt from converging.
 
 After submitting the pose, activate MOLA-LO:
 
@@ -39,29 +46,38 @@ ros2 service call /mola_runtime_param_set \
   "{parameters: \"mola::LidarOdometry:lidar_odom:\\n  active: true\\n\"}"
 ```
 
-Future GNSS/INS software may publish the same initial-pose request or use the
-relocalization service. This package does not subscribe to GNSS or IMU and
-does not prevent that later initializer from being added.
+The GNSS/INS pose is not used for initialization; the initial pose is always
+given by hand.
 
 ## Output interface
 
-No A1 republisher is added because MOLA already publishes standard messages:
+MOLA outputs:
 
 | Output | Type | Contract |
 | --- | --- | --- |
-| `/lidar_odometry/pose` | `nav_msgs/msg/Odometry` | `header.frame_id=map`, `child_frame_id=base_link`, pose and 6x6 pose covariance |
-| `/lidar_odometry/pose_quality` | `std_msgs/msg/Float32` | last ICP quality in the MOLA localization update |
+| `/lidar_odometry/pose` | `nav_msgs/msg/Odometry` | `header.frame_id=map`, `child_frame_id=base_link`, pose and 6x6 pose covariance, ~10 Hz |
+| `/lidar_odometry/pose_quality` | `std_msgs/msg/Float32` | ICP quality of the pose just published |
 | `/lidar_odometry/localmap_points` | `sensor_msgs/msg/PointCloud2` | loaded `localmap` metric-map layer |
-| `/tf` | `tf2_msgs/msg/TFMessage` | direct `map -> base_link` localization transform |
+| `/tf` | `tf2_msgs/msg/TFMessage` | with GNSS (REP-105): `map -> odom`; without GNSS: `map -> base_link` |
 | `/diagnostics` | `diagnostic_msgs/msg/DiagnosticArray` | input freshness, ICP quality, timing, map, and aggregate status |
 
-The upstream Odometry publisher fills pose and pose covariance. It does not
-populate measured twist/twist covariance in this path, so downstream fusion
-must not interpret zero-initialized twist as a measured zero velocity.
+MOLA fills pose and pose covariance only; the twist of `/lidar_odometry/pose`
+is always zero and must not be read as a measured zero velocity.
 
-## Restart test
+Controller outputs, with GNSS only (`localization_odom_merger`, ~100 Hz):
+
+| Output | Type | Contract |
+| --- | --- | --- |
+| `/localization/odom` | `nav_msgs/msg/Odometry` | `map -> base_link` pose, INS velocity in `base_link` axes, heading (deg) in `twist.angular.x` |
+| `/localization/accel` | `geometry_msgs/msg/AccelWithCovarianceStamped` | INS acceleration in `base_link` axes, 0.4 s mean |
+
+Nothing is published on `/localization/*` before the first LO pose. Field
+definitions are in [controller_interface.md](../controller_interface.md), and
+how the merger combines GNSS and LO is in
+[gnss_integration.md](../setup/gnss_integration.md#controller-output-localizationodom-localizationaccel).
+
+## Restart
 
 Stop localization, run the same launch command with the same map, submit the
-initial pose again, activate, and verify a continuous pose/quality stream.
-Map load, lock, motion continuity, and restart are currently
-`PENDING — requires PandarXT hardware`.
+initial pose again, activate, and check that `/lidar_odometry/pose`,
+`/lidar_odometry/pose_quality` and `/localization/odom` stream continuously.

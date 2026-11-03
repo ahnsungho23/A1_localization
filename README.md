@@ -1,10 +1,14 @@
 # A1 localization workspace
 
-ROS 2 Humble 기반 A1 실차 localization workspace다. 기존 Hesai PandarXT
-bringup을 유지하면서 공식 MOLA-LO 기반 LiDAR-only mapping 및 map-based
-localization source integration을 제공한다. Applanix GNSS/INS는 REP-105
-구조(`odom -> base_link`는 INS, `map -> odom`은 MOLA)로 결합하며, MOLA-LO
-자체의 pose 추정에는 GNSS/IMU를 사용하지 않는다.
+ROS 2 Humble 기반 A1 실차 localization workspace다. Hesai PandarXT와 MOLA-LO로
+LiDAR 지도를 만들고 그 지도에서 위치를 추정하며, Applanix GNSS/INS를 REP-105
+구조(`map -> odom`은 MOLA, `odom -> base_link`는 INS)로 결합한다.
+`localization_odom_merger`가 두 결과를 합쳐 제어기용 100 Hz
+`/localization/odom`, `/localization/accel`을 발행한다. MOLA-LO 자체의 pose
+추정에는 GNSS/IMU를 사용하지 않는다.
+
+전체 구조는 [architecture](docs/architecture.md), 제어기 출력 형식은
+[controller interface](docs/controller_interface.md)를 본다.
 
 ## 지원 환경
 
@@ -13,40 +17,33 @@ localization source integration을 제공한다. Applanix GNSS/INS는 REP-105
 
 ## 현재 상태
 
-다음 항목은 이전 PandarXT bringup milestone에서 실제 하드웨어로 기록된
-이력이다. 이번 MOLA integration의 현재 하드웨어 검증 결과로 재사용하지
-않는다.
+실차 하드웨어(PandarXT, Applanix POS LVX)로 bag을 녹화해 확인한 항목:
 
-- `a1_lidar_bringup` 빌드 성공
-- 이 workspace의 Hesai 드라이버 실행 성공
-- 실제 ROS 노드 이름: `/hesai_ros_driver_node`
-- `/lidar_points`: `sensor_msgs/msg/PointCloud2`, publisher 1개, Reliability `RELIABLE`
-- explicit type과 best-effort subscriber QoS로 실제 PointCloud2 메시지 수신 성공
-- PointCloud2 frame: `hesai_lidar`
-- PointCloud2 width: `128000`
-- PointCloud2 point step: `26` bytes
-- PointCloud2 fields: `x`, `y`, `z`, `intensity`, `ring`, `timestamp`
+- `/lidar_points`: `sensor_msgs/msg/PointCloud2`, 10 Hz, frame `hesai_lidar`,
+  width `128000`, point step `26`, fields `x`, `y`, `z`, `intensity`, `ring`,
+  `timestamp`
 - `/lidar_packets_loss`: 손실 0
-- `timestamp_type:=1`에서 PointCloud2 header 시간이 host 시간과 일치
-- launch에서 runtime YAML과 Firetime 경로 자동 생성
-- PandarXT 테스트에서 `/lidar_imu` publisher만 생성되고 10초 동안 실제 IMU 메시지는 발행되지 않음
+- Applanix: `/gsof_client/*` 100 Hz(GSOF #49), GSOF #50 5 Hz
+- MOLA-LO: 2026-10-08 mapping bag 두 개(약 2.6 km, 2.9 km)를 끝까지 추적
+- `localization_odom_merger`: 같은 bag 재생으로 RTK fixed 주행 중 LO 대비
+  위치 오차 약 7~9 cm rms, 정차 중 GNSS 끌림(최대 6.9 m)을 stationary hold로 제거
 
-MOLA-LO source integration, dependency/build/static validation, launch/config
-inspection은 이 workspace에서 수행한다. 현재 PandarXT가 물리적으로 연결되어
-있지 않으므로 live sensor, odometry, mapping, localization 결과는 모두
-`PENDING — requires PandarXT hardware`이며 임의로 PASS 처리하지 않는다.
+아직 실차에서 확인하지 않은 항목:
 
-PandarXT의 `/lidar_imu`를 localization 입력으로 사용하지 않는다. 현재
-MOLA-LO는 LiDAR registration에서 추정한 twist로 scan deskew를 수행한다.
-향후 별도 fusion 단계에서 외부 IMU를 사용한다면 `/imu/data_raw` 같은 별도
-topic 이름을 사용한다.
+- 현재 merger(정차 hold, heading 출력)의 실시간 동작
+- Applanix 장착각 변경 후 `/a1_gnss/odom` 속도·가속도 축(직진 시 vx ≈ 속도, vy ≈ 0)
+- `time_source: "now"` 설정에서 LiDAR와 GNSS 시각 정렬
+- PTP lock
+
+PandarXT의 `/lidar_imu`는 publisher만 생기고 메시지는 발행되지 않으므로 사용하지
+않는다. MOLA-LO는 LiDAR registration에서 추정한 twist로 scan deskew를 수행한다.
 
 ## 저장소 받기
 
-Hesai 드라이버와 내부 SDK가 submodule이므로 반드시 recursive clone을 사용한다. `<repository-url>`은 GitHub 원격 저장소가 생성된 뒤 실제 URL로 교체해야 하는 placeholder다.
+외부 드라이버와 MOLA가 submodule이므로 recursive clone을 사용한다.
 
 ```bash
-git clone --recurse-submodules <repository-url> a1_localization_ws
+git clone --recurse-submodules git@github.com:ahnsungho23/A1_localization.git a1_localization_ws
 cd a1_localization_ws
 ```
 
@@ -81,9 +78,71 @@ colcon build --symlink-install
 source install/setup.zsh
 ```
 
-## 실행
+MOLA 수정판(`mola_metric_maps` 3.1.1)도 이 workspace에서 함께 빌드되므로 별도
+overlay를 source할 필요가 없다. 자세한 내용은
+[MOLA-LO installation](docs/setup/mola_installation.md).
 
-현재는 PTP Grandmaster가 없으므로 host receive time을 사용한다.
+## 차량 실행
+
+LiDAR 드라이버, Applanix GNSS/INS, 차량 TF, MOLA, `/localization/*` 출력과
+RViz를 한 번에 실행한다. 아래 명령은 모두 다음을 먼저 실행한 터미널에서 한다.
+
+```zsh
+source /opt/ros/humble/setup.zsh
+source ~/a1_localization_ws/install/setup.zsh
+```
+
+### Mapping
+
+```zsh
+ros2 launch a1_bringup mapping.launch.py
+```
+
+실행하면 바로 mapping이 시작된다. 기본 출력은 `<workspace>/maps/track/map`이며
+기존 지도를 덮어쓴다. 다른 이름은 `map_output_path:=<prefix>`로 지정한다.
+
+주행이 끝나면 차를 세우고 다른 터미널에서 지도를 저장한 뒤 launch를 Ctrl-C로 끈다.
+`map_path`는 `map_output_path`와 같게 맞춘다.
+
+```zsh
+ros2 service call /map_save mola_msgs/srv/MapSave \
+  "{map_path: '$HOME/a1_localization_ws/maps/track/map'}"
+```
+
+응답이 `success: true`이고 `map.mm`, `map.simplemap`이 생겼는지 확인한다.
+위경도와 연결하려면 이어서 georeferencing을 실행한다(제어기가 `map` 좌표만 쓰면
+필요 없다).
+
+```zsh
+cd ~/a1_localization_ws/maps/track
+mola-sm-georeferencing -i map.simplemap --write-into map.mm -o map.georef
+```
+
+### 위치 추정
+
+```zsh
+ros2 launch a1_bringup localization.launch.py
+```
+
+기본 지도는 `<workspace>/maps/track/map`이며 다른 지도는
+`map:=<prefix 또는 .mm 경로>`로 지정한다. MOLA는 꺼진 상태로 시작하므로 다음 두
+단계를 거쳐야 `/localization/odom`이 나온다.
+
+1. RViz의 **2D Pose Estimate**로 차의 위치와 방향을 찍는다. 초기 yaw 오차가
+   5°를 넘으면 ICP가 붙지 않을 수 있다.
+2. MOLA를 활성화한다.
+
+   ```zsh
+   ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+     "{parameters: \"mola::LidarOdometry:lidar_odom:\\n  active: true\\n\"}"
+   ```
+
+두 launch 모두 `a1_localization` `mola.launch.py`의 다른 인자(`rviz:=false`,
+`start_lidar_driver:=false` 등)를 뒤에 붙일 수 있다.
+
+## LiDAR 드라이버만 실행
+
+LiDAR와 GNSS 모두 현재는 host 수신 시각을 사용한다(PTP lock 확인 전).
 
 ```zsh
 ros2 launch a1_lidar_bringup pandarxt.launch.py timestamp_type:=1
@@ -102,56 +161,29 @@ Firetime correction은 LiDAR 채널별 발광 시각 오차를 보정하고, PTP
 움직인 영향을 LiDAR registration twist 또는 별도 motion source로 보상하는
 처리다. 어느 하나가 나머지를 대신하지 않는다.
 
-## 차량 실행 (최상위 launch)
+## GNSS 없이 LiDAR만으로 실행
 
-LiDAR 드라이버, Applanix GNSS/INS, 차량 TF, MOLA, `/localization/*` 출력을
-한 번에 실행한다.
-
-```zsh
-# mapping: 기본 출력 <workspace>/maps/track/map(.mm, .simplemap)
-ros2 launch a1_bringup mapping.launch.py
-
-# 위치 추정: 기본 지도 <workspace>/maps/track/map
-ros2 launch a1_bringup localization.launch.py
-```
-MOLA 실행
-ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet "{parameters: \"mola::LidarOdometry:lidar_odom:\\n  active: true\\n\"}"
-
-
-다른 지도는 `map:=<prefix 또는 .mm 경로>`로 지정한다. `a1_localization`
-`mola.launch.py`의 다른 인자(`rviz:=false`, `map_output_path:=...` 등)도 뒤에
-붙일 수 있다. 제어기 출력 형식은
-[controller interface](docs/controller_interface.md)를 따른다.
-
-## MOLA-LO mapping 및 localization
-
-LiDAR-only mapping은 기존 PandarXT launch를 include한다.
+`a1_localization`의 launch는 기본값이 `use_gnss:=false`다. 이때 GNSS 드라이버,
+merger(`/localization/*`), 차량 static TF가 실행되지 않고 MOLA가
+`map -> base_link`를 직접 발행한다. `base_link -> hesai_lidar` TF는
+`a1_gnss_bringup` `vehicle_tf.launch.py`를 따로 실행하거나
+`use_fixed_lidar_pose:=true lidar_pose:="[x,y,z,yaw,pitch,roll]"`로 준다.
 
 ```zsh
 ros2 launch a1_localization mapping.launch.py
+ros2 launch a1_localization localization.launch.py map:=$(pwd)/maps/track/map
 ```
 
-저장한 MOLA map prefix로 localization-only mode를 실행한다.
+## 문서
 
-```zsh
-ros2 launch a1_localization localization.launch.py \
-  map:=$(pwd)/maps/track/map
-```
-
-자세한 설치, interface, map 저장, initial pose, output 및 검증 경계는 다음
-문서를 따른다.
-
+- [Architecture](docs/architecture.md)
+- [Controller interface](docs/controller_interface.md)
 - [MOLA-LO installation](docs/setup/mola_installation.md)
-- [PandarXT to MOLA-LO interface](docs/setup/pandarxt_mola_interface.md)
-- [LiDAR-only mapping](docs/operation/mola_mapping.md)
-- [Map-based LiDAR localization](docs/operation/mola_localization.md)
 - [Applanix GNSS/INS integration (REP-105)](docs/setup/gnss_integration.md)
-
-Applanix GNSS/INS를 결합할 때는 `use_gnss:=true`를 추가한다. 이때 MOLA는
-REP-105(`map -> odom`)로 발행하고, `odom -> base_link`는
-`a1_gnss_bringup`의 relay가 발행한다. 실측 extrinsics와 장비 IP가 없으면
-launch가 시작을 거부한다. 자세한 내용은
-[GNSS integration](docs/setup/gnss_integration.md)을 따른다.
+- [PandarXT setup reference](docs/setup/pandarxt_setup.md)
+- [PandarXT to MOLA-LO interface](docs/setup/pandarxt_mola_interface.md)
+- [Mapping](docs/operation/mola_mapping.md)
+- [Map-based localization](docs/operation/mola_localization.md)
 
 ## Read-only 검증
 
@@ -182,7 +214,7 @@ ros2 daemon start
 │   ├── architecture.md              # 데이터 흐름, 좌표계, 노드/토픽 요약
 │   ├── controller_interface.md      # 제어기가 받는 /localization/* 필드 정의
 │   ├── setup/
-│   │   ├── gnss_integration.md      # Applanix 드라이버, extrinsics, 시각 변환, REP-105
+│   │   ├── gnss_integration.md      # Applanix 드라이버, extrinsics, 시각, REP-105, merger
 │   │   ├── mola_installation.md     # MOLA source/dependency/build 기준
 │   │   ├── pandarxt_mola_interface.md # PointCloud2/deskew/TF contract
 │   │   └── pandarxt_setup.md        # LiDAR/host/PTP 설정 기준

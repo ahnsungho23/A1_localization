@@ -18,10 +18,12 @@ base_link_to_ins:
   yaw: 0
 
 base_link_to_lidar:
+  # Mounted rotated +90 deg about z: LiDAR x = vehicle left, y = rear, z = up.
+  # Position not measured yet (0 = LiDAR center is the base_link origin).
   frame_id: hesai_lidar
   x: 0
   y: 0
   z: 0
   roll: 0
   pitch: 0
-  yaw: 0
+  yaw: 90

@@ -12,7 +12,7 @@ from launch.actions import (
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import SetRemap
+from launch_ros.actions import Node, SetRemap
 import yaml
 
 
@@ -185,6 +185,21 @@ def _launch_setup(context, package_share, defaults):
                     "odom_frame": "odom",
                     "use_sim_time": LaunchConfiguration("use_sim_time"),
                 }.items(),
+            )
+        )
+
+    if use_gnss:
+        # Controller output: LO pose + GNSS velocity/acceleration at the LO
+        # rate (/localization/odom, /localization/accel).
+        actions.append(
+            Node(
+                package="a1_gnss_bringup",
+                executable="localization_odom_merger.py",
+                name="localization_odom_merger",
+                parameters=[{"use_sim_time": _parse_bool(
+                    "use_sim_time",
+                    LaunchConfiguration("use_sim_time").perform(context))}],
+                output="screen",
             )
         )
 

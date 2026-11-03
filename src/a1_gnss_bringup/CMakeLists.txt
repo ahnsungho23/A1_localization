@@ -9,7 +9,7 @@ install(
 )
 
 install(
-  PROGRAMS scripts/gnss_odom_relay.py
+  PROGRAMS scripts/gnss_odom_relay.py scripts/localization_odom_merger.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

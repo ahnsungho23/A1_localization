@@ -29,6 +29,10 @@ gsof_client:
     publish_ros_msgs: true
     publish_gsof_msgs: true
 
-    # GPS-epoch time (1980-01-06). gnss_odom_relay.py converts it to UTC Unix
-    # time; the host clock is disciplined by the TM2000A through ptp4l.
-    time_source: "gps"
+    # "now": stamp with the host clock on receipt, the same clock the PandarXT
+    # driver uses (timestamp_type 1). In bag a1_loc_20261006_005653 the host
+    # clock was not on GPS time: GPS stamps ran 70 -> 170 ms ahead of it and
+    # drifted, so "gps" stamps did not line up with the LiDAR stamps.
+    # Switch back to "gps" (relay converts GPS epoch -> UTC) only once ptp4l
+    # keeps the host clock locked to the TM2000A (pmc master_offset < ~100 us).
+    time_source: "now"

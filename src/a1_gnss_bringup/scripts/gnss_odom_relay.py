@@ -5,11 +5,16 @@ Inputs (trimble_driver_ros, publish_rep103=true, publish_tf=false):
   /gsof_client/odom    nav_msgs/Odometry   pose of the INS output point ("ins")
                                            in the driver's local ENU plane
   /gsof_client/navsat  sensor_msgs/NavSatFix
+  /gsof_client/gsof/ins_solution_49  gsof_msgs/NavigationSolution49
+                                           (gravity-free acceleration,
+                                           Applanix long/trans/down axes)
 
 Outputs:
   /tf                  odom -> base_link
   /a1_gnss/odom        nav_msgs/Odometry   odom -> base_link
   /a1_gnss/navsat      sensor_msgs/NavSatFix (same content, converted stamp)
+  /a1_gnss/accel       geometry_msgs/AccelWithCovarianceStamped, linear
+                       acceleration in base_link axes (unfiltered, ~100 Hz)
 
 With time_source=gps the driver stamps GPS-epoch time (week * 604800 s + ms,
 counted from 1980-01-06), which is not comparable to ROS/LiDAR UTC Unix time.
@@ -21,11 +26,15 @@ The pose is moved from the INS output point to base_link with the measured
 static base_link -> ins extrinsic:
 
   T_odom_base = T_odom_ins * inv(T_base_ins)
+
+The acceleration is only rotated into base_link axes; the lever-arm terms
+(angular acceleration and centripetal) are not added.
 """
 
 import math
 
-from geometry_msgs.msg import TransformStamped
+from geometry_msgs.msg import AccelWithCovarianceStamped, TransformStamped
+from gsof_msgs.msg import NavigationSolution49
 from nav_msgs.msg import Odometry
 import rclpy
 from rclpy.node import Node
@@ -124,14 +133,22 @@ class GnssOdomRelay(Node):
             "output_odom_topic", "/a1_gnss/odom").value
         output_navsat = self.declare_parameter(
             "output_navsat_topic", "/a1_gnss/navsat").value
+        input_ins = self.declare_parameter(
+            "input_ins_solution_topic", "/gsof_client/gsof/ins_solution_49").value
+        output_accel = self.declare_parameter(
+            "output_accel_topic", "/a1_gnss/accel").value
 
         # trimble_driver_ros publishes with the default (reliable) QoS, depth 100.
         self.odom_pub = self.create_publisher(Odometry, output_odom, 100)
         self.navsat_pub = self.create_publisher(NavSatFix, output_navsat, 100)
+        self.accel_pub = self.create_publisher(
+            AccelWithCovarianceStamped, output_accel, 100)
         self.tf_broadcaster = TransformBroadcaster(self) if self.publish_tf else None
 
         self.create_subscription(Odometry, input_odom, self.on_odom, 100)
         self.create_subscription(NavSatFix, input_navsat, self.on_navsat, 100)
+        self.create_subscription(
+            NavigationSolution49, input_ins, self.on_ins_solution, 100)
 
         self.warned_child_frame = False
 
@@ -165,6 +182,22 @@ class GnssOdomRelay(Node):
     def on_navsat(self, msg):
         msg.header.stamp = self.convert_stamp(msg.header.stamp)
         self.navsat_pub.publish(msg)
+
+    def on_ins_solution(self, msg):
+        # Applanix vehicle axes (long = forward, trans = right, down) -> FLU of
+        # the INS, then into base_link axes.
+        a_ins = (msg.acc_long, -msg.acc_trans, -msg.acc_down)
+        a_base = quat_rotate(self.q_base_ins, a_ins)
+
+        out = AccelWithCovarianceStamped()
+        out.header.stamp = self.convert_stamp(msg.header.stamp)
+        out.header.frame_id = self.base_frame
+        (out.accel.accel.linear.x,
+         out.accel.accel.linear.y,
+         out.accel.accel.linear.z) = a_base
+        # GSOF #49 carries no acceleration uncertainty.
+        out.accel.covariance[0] = -1.0
+        self.accel_pub.publish(out)
 
     def on_odom(self, msg):
         if msg.child_frame_id != self.ins_frame and not self.warned_child_frame:

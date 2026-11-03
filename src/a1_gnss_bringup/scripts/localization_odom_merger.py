@@ -15,8 +15,10 @@ Inputs:
 Outputs (one message each per GNSS sample, same header.stamp):
   /localization/odom    nav_msgs/Odometry  map -> base_link
     pose              C * G(t), C = correction map <- odom, G = GNSS pose
+                      (the latest LO pose during a stationary hold)
     pose.covariance   from the last accepted LO pose
     twist             linear.x / y and angular.z of this GNSS sample; the rest 0
+                      (all 0 during a stationary hold)
   /localization/accel   geometry_msgs/AccelWithCovarianceStamped, frame base_link
     accel.linear.x / y   mean of the GNSS samples in the last accel_window_sec
 
@@ -33,6 +35,18 @@ Blending. A new correction is not applied as a step. The offset between the
 pose being published and the newly corrected pose is taken in the vehicle frame
 and shrunk linearly to zero over correction_blend_sec, so the output moves
 smoothly and a heading change does not swing the position about the odom origin.
+
+Stationary hold. Without RTK fixed, the INS can report ~0.7 m/s while the
+vehicle stands still and then jump its position by metres; the merger would
+follow that motion and reject the (correct) LO poses as jumps. Standstill is
+therefore judged by LO alone: once hold_enter_scans consecutive LO poses moved
+less than hold_still_m / hold_still_deg, the output follows the LO pose
+directly, GNSS motion is ignored and the published twist is zero. The hold
+ends when LO has moved more than hold_exit_lo_m from where the hold started,
+or when the GNSS speed exceeds hold_exit_speed while the last LO step also
+shows motion (GNSS speed alone is not trusted). On exit the correction is
+re-anchored to the held pose, so the GNSS drift accumulated during the hold
+does not appear as a step.
 
 Both clocks must agree: LO stamps and GNSS stamps have to come from the same
 time base (see time_source in gsof_client.yaml).
@@ -174,6 +188,16 @@ class LocalizationOdomMerger(Node):
         self.accel_window_ns = round(self.declare_parameter(
             "accel_window_sec", 0.4).value * NS_PER_SEC)
 
+        self.hold_enabled = self.declare_parameter("stationary_hold", True).value
+        self.hold_enter_scans = self.declare_parameter("hold_enter_scans", 5).value
+        self.hold_still_m = self.declare_parameter("hold_still_m", 0.01).value
+        self.hold_still_rad = math.radians(
+            self.declare_parameter("hold_still_deg", 0.1).value)
+        self.hold_exit_lo_m = self.declare_parameter("hold_exit_lo_m", 0.05).value
+        self.hold_exit_speed = self.declare_parameter("hold_exit_speed", 0.15).value
+        self.hold_exit_lo_step_m = self.declare_parameter(
+            "hold_exit_lo_step_m", 0.015).value
+
         # The Applanix velocity covariance is not usable (0 or up to 1e3, and
         # labelled in ENU axes), so fixed standard deviations are reported.
         linear_std = self.declare_parameter("twist_linear_std", 0.05).value
@@ -197,6 +221,13 @@ class LocalizationOdomMerger(Node):
         self.pose_covariance = None
         self.last_output = None    # last published map -> base_link pose
         self.base_frame = None
+
+        self.last_lo = None        # previous LO pose, for the standstill test
+        self.lo_step_m = math.inf  # translation between the last two LO poses
+        self.still_scans = 0       # consecutive LO steps below the still limits
+        self.hold = False
+        self.hold_pose = None      # published pose while holding (follows LO)
+        self.hold_anchor = None    # LO pose when the hold started
 
         # Best effort subscribers accept both reliable and best effort publishers.
         input_qos = QoSProfile(depth=100, reliability=ReliabilityPolicy.BEST_EFFORT)
@@ -222,11 +253,28 @@ class LocalizationOdomMerger(Node):
         self.accel.append((stamp_ns(msg.header.stamp), a.x, a.y))
 
     def on_pose(self, msg):
-        newest_gnss = self.gnss[-1][0] if self.gnss else None
-        self.pending.append([
-            stamp_ns(msg.header.stamp), newest_gnss, pose_from_msg(msg.pose.pose),
-            list(msg.pose.covariance), None])
+        lidar_pose = pose_from_msg(msg.pose.pose)
         self.base_frame = msg.child_frame_id
+        self.update_standstill(lidar_pose)
+
+        if self.hold:
+            # LO is trusted directly while standing still.
+            self.hold_pose = lidar_pose
+            self.pose_covariance = list(msg.pose.covariance)
+            moved = pose_compose(pose_inverse(self.hold_anchor), lidar_pose)
+            if math.sqrt(sum(c * c for c in moved[0])) > self.hold_exit_lo_m:
+                self.exit_hold("LO moved")
+            return
+
+        if not self.gnss:
+            # No GNSS sample can bracket this scan; queued without an arrival
+            # stamp it would also block the queue if its quality never came.
+            self.get_logger().warn(
+                "LO pose before any GNSS sample; dropped", throttle_duration_sec=5.0)
+            return
+        self.pending.append([
+            stamp_ns(msg.header.stamp), self.gnss[-1][0], lidar_pose,
+            list(msg.pose.covariance), None])
 
     def on_quality(self, msg):
         for entry in reversed(self.pending):
@@ -244,8 +292,48 @@ class LocalizationOdomMerger(Node):
         while self.accel and t - self.accel[0][0] > self.buffer_ns:
             self.accel.popleft()
 
-        self.process_pending(t)
+        if self.hold:
+            speed = math.hypot(msg.twist.twist.linear.x, msg.twist.twist.linear.y)
+            if speed > self.hold_exit_speed and self.lo_step_m > self.hold_exit_lo_step_m:
+                self.exit_hold(f"GNSS speed {speed:.2f} m/s and LO moving")
+        elif (self.hold_enabled and self.correction is not None
+              and self.last_output is not None
+              and self.still_scans >= self.hold_enter_scans):
+            self.enter_hold()
+
+        if not self.hold:
+            self.process_pending(t)
         self.publish(t, msg)
+
+    # -------------------------------------------------------------- standstill
+    def update_standstill(self, lidar_pose):
+        if self.last_lo is not None:
+            step = pose_compose(pose_inverse(self.last_lo), lidar_pose)
+            self.lo_step_m = math.sqrt(sum(c * c for c in step[0]))
+            still = (self.lo_step_m < self.hold_still_m
+                     and quat_angle(step[1]) < self.hold_still_rad)
+            self.still_scans = self.still_scans + 1 if still else 0
+        self.last_lo = lidar_pose
+
+    def enter_hold(self):
+        self.hold = True
+        self.hold_pose = self.last_output
+        self.hold_anchor = self.last_lo
+        # LO poses queued for GNSS matching are superseded by the hold.
+        self.pending.clear()
+        self.blend_start_ns = None
+        self.blend_offset = IDENTITY
+        self.get_logger().info("standstill (LO): holding the LO pose, GNSS motion ignored")
+
+    def exit_hold(self, reason):
+        # Re-anchor so the GNSS drift accumulated during the hold is not a step.
+        self.correction = pose_compose(self.hold_pose, pose_inverse(self.gnss[-1][1]))
+        self.last_output = self.hold_pose
+        self.rejected = []
+        self.pending.clear()
+        self.still_scans = 0
+        self.hold = False
+        self.get_logger().info(f"standstill hold ended ({reason}); correction re-anchored")
 
     # -------------------------------------------------------------- correction
     def gnss_pose_at(self, t):
@@ -349,7 +437,10 @@ class LocalizationOdomMerger(Node):
                 throttle_duration_sec=5.0)
             return
 
-        pose = pose_compose(self.correction, self.gnss[-1][1])
+        if self.hold:
+            pose = self.hold_pose
+        else:
+            pose = pose_compose(self.correction, self.gnss[-1][1])
         if self.blend_start_ns is not None:
             s = 1.0 if self.blend_ns <= 0 else min(
                 1.0, (t - self.blend_start_ns) / self.blend_ns)
@@ -372,10 +463,11 @@ class LocalizationOdomMerger(Node):
          out.pose.pose.orientation.z,
          out.pose.pose.orientation.w) = pose[1]
         out.pose.covariance = self.pose_covariance
-        twist = gnss_msg.twist.twist
-        out.twist.twist.linear.x = twist.linear.x
-        out.twist.twist.linear.y = twist.linear.y
-        out.twist.twist.angular.z = twist.angular.z
+        if not self.hold:
+            twist = gnss_msg.twist.twist
+            out.twist.twist.linear.x = twist.linear.x
+            out.twist.twist.linear.y = twist.linear.y
+            out.twist.twist.angular.z = twist.angular.z
         out.twist.covariance = self.twist_covariance
 
         accel = AccelWithCovarianceStamped()

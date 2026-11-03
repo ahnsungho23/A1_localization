@@ -10,9 +10,9 @@
 base_link_to_ins:            
   # Applanix output point as configured on the device (not shifted to base_link).
   frame_id: ins
-  x: 0.49
+  x: 0.84
   y: 0.0
-  z: -0.34
+  z: 0.50
   roll: 0
   pitch: 0
   yaw: 0
@@ -21,9 +21,9 @@ base_link_to_lidar:
   # Mounted rotated +90 deg about z: LiDAR x = vehicle left, y = rear, z = up.
   # Position not measured yet (0 = LiDAR center is the base_link origin).
   frame_id: hesai_lidar
-  x: 0
+  x: 1.16
   y: 0
-  z: 0
+  z: 1.20
   roll: 0
   pitch: 0
   yaw: 90

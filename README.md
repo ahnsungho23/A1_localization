@@ -114,6 +114,9 @@ ros2 launch a1_bringup mapping.launch.py
 # 위치 추정: 기본 지도 <workspace>/maps/track/map
 ros2 launch a1_bringup localization.launch.py
 ```
+MOLA 실행
+ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet "{parameters: \"mola::LidarOdometry:lidar_odom:\\n  active: true\\n\"}"
+
 
 다른 지도는 `map:=<prefix 또는 .mm 경로>`로 지정한다. `a1_localization`
 `mola.launch.py`의 다른 인자(`rviz:=false`, `map_output_path:=...` 등)도 뒤에

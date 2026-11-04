@@ -85,61 +85,134 @@ overlay를 source할 필요가 없다. 자세한 내용은
 ## 차량 실행
 
 LiDAR 드라이버, Applanix GNSS/INS, 차량 TF, MOLA, `/localization/*` 출력과
-RViz를 한 번에 실행한다. 아래 명령은 모두 다음을 먼저 실행한 터미널에서 한다.
+RViz를 한 번에 실행한다. 항상 LiDAR와 GNSS/INS를 함께 사용하며, LiDAR만으로
+실행하는 모드는 없다.
 
-```zsh
-source /opt/ros/humble/setup.zsh
-source ~/a1_localization_ws/install/setup.zsh
+모든 터미널에서 먼저 실행한다. `WS`는 workspace 경로, `MAP_DIR`은 지도 폴더이며
+**모든 터미널에서 같은 값**이어야 한다.
+
+```bash
+source /opt/ros/humble/setup.bash
+WS=$HOME/git/A1_localization                 # 이 PC의 workspace 경로
+source $WS/install/setup.bash
+cd $WS
+MAP_DIR=$WS/maps/track_20261104              # 지도 폴더 (mapping: 새 이름, 위치 추정: 실제 폴더 이름)
 ```
 
-### Mapping
+### Mapping (georef 가능한 지도)
 
-```zsh
-ros2 launch a1_bringup mapping.launch.py
+**① 사전 확인 (launch 전)**
+
+```bash
+pgrep -af "ros2 launch a1_bringup"        # 비어 있어야 함. 떠 있으면 끄기
+nc -zv -w2 192.168.53.100 5017            # succeeded 가 나와야 함
+ls $MAP_DIR 2>/dev/null                   # 비어 있어야 함 (있으면 덮어씀 → 이름 바꾸기)
 ```
 
-실행하면 바로 mapping이 시작된다. 기본 출력은 `<workspace>/maps/track/map`이며
-기존 지도를 덮어쓴다. 다른 이름은 `map_output_path:=<prefix>`로 지정한다.
+**② mapping 시작**
 
-주행이 끝나면 차를 세우고 다른 터미널에서 지도를 저장한 뒤 launch를 Ctrl-C로 끈다.
-`map_path`는 `map_output_path`와 같게 맞춘다.
-
-```zsh
-ros2 service call /map_save mola_msgs/srv/MapSave \
-  "{map_path: '$HOME/a1_localization_ws/maps/track/map'}"
+```bash
+ros2 launch a1_bringup mapping.launch.py map_output_path:=$MAP_DIR/map
 ```
 
-응답이 `success: true`이고 `map.mm`, `map.simplemap`이 생겼는지 확인한다.
-위경도와 연결하려면 이어서 georeferencing을 실행한다(제어기가 `map` 좌표만 쓰면
-필요 없다).
+켜는 순간부터 mapping이 시작된다. 출발하기 전에 ③을 끝낸다.
 
-```zsh
-cd ~/a1_localization_ws/maps/track
+**③ 출발 전 GNSS 확인 (다른 터미널)**
+
+```bash
+ros2 topic hz /a1_gnss/navsat                                              # 약 100 Hz
+ros2 topic echo /gsof_client/gsof/ins_solution_49 --once --field status    # gnss 4 (RTK fixed)
+ros2 topic echo /gsof_client/gsof/ins_solution_rms_50 --once               # GSOF #50 들어오는지
+ros2 topic echo /a1_gnss/odom --field twist.twist.linear                   # 직진 시 x ≈ +속도, y ≈ 0
+```
+
+MOLA는 각 키프레임에 1초 이내의 GNSS 측정을 붙여 `.simplemap`에 저장하고,
+georeferencing은 이 측정을 쓴다. 시작한 뒤에 GNSS 문제를 발견했다면 Ctrl-C로
+끄고 다시 시작한다.
+
+**④ 주행**: 회전이 섞인 트랙을 가능한 한 RTK fixed 상태로 달린다.
+
+**⑤ 저장 (차를 세우고 다른 터미널에서)**
+
+```bash
+ros2 service call /map_save mola_msgs/srv/MapSave "{map_path: '$MAP_DIR/map'}"
+```
+
+응답이 `success: true`인지 확인한 다음에 launch를 Ctrl-C로 끈다.
+
+**⑥ 전체 지도 다시 만들기 (필수)**
+
+⑤의 `map.mm`은 MOLA의 로컬 지도라서 멈춘 위치 주변 약 100~150 m만 담긴다
+(로컬 지도는 이보다 먼 키프레임을 지운다). 트랙 전체는 `map.simplemap`에만
+있으므로 여기서 전체 지도를 만든다.
+
+```bash
+cd $MAP_DIR
+mv map.mm map_local.mm
+sm2mm -i map.simplemap -o map.mm \
+  -p $WS/src/external/mp2p_icp/mp2p_icp_core/demos/sm2mm_pointcloud_voxelize_keyframe_map.yaml \
+  -l libmola_metric_maps.so
+mm-info map.mm                            # 범위가 트랙 전체인지 확인 (mm-viewer map.mm 으로도 확인)
+```
+
+**⑦ GNSS 확인과 georeferencing (⑥ 다음에)**
+
+```bash
+sm-cli info map.simplemap                 # gps 관측이 있는지 확인
 mola-sm-georeferencing -i map.simplemap --write-into map.mm -o map.georef
 ```
 
+에러 없이 끝나면 성공이며 맞춘 결과의 오차(RMSE)가 출력된다. ⑥보다 먼저 하면
+georef 정보가 로컬 지도에 들어간다. 제어기 출력은 `map` 좌표라 georef 여부와
+상관없이 같다.
+
+**지도 파일**
+
+| 파일 | 생기는 시점 | 내용 |
+| --- | --- | --- |
+| `map.simplemap` | ⑤ | 키프레임 포즈 + LiDAR 스캔 + GNSS 측정. 전체 지도와 georef의 입력 |
+| `map_local.mm` | ⑤ → ⑥에서 이름 변경 | 멈춘 위치 주변만 담긴 로컬 지도 (보관용) |
+| `map.mm` | ⑥ | 위치 추정에 쓰는 트랙 전체 지도. ⑦ 후에는 georef 정보 포함 |
+| `map.georef` | ⑦ | map ↔ 위경도(ENU/UTM) 변환 |
+
+`map_output_path`를 빼면 기본값 `<workspace>/maps/track/map`에 덮어쓴다.
+`maps/`는 git에서 제외되므로 지도는 따로 백업한다.
+
 ### 위치 추정
 
-```zsh
-ros2 launch a1_bringup localization.launch.py
+`MAP_DIR`은 실제로 만들어진 폴더 이름으로 지정한다(`ls $WS/maps/`).
+
+```bash
+# 터미널 1
+pgrep -af "ros2 launch a1_bringup"        # 비어 있어야 함
+nc -zv -w2 192.168.53.100 5017            # succeeded
+ros2 launch a1_bringup localization.launch.py map:=$MAP_DIR/map
+
+# 터미널 2: 녹화 시작 (초기 포즈를 찍기 전에)
+ros2 bag record -s mcap -o ~/rosbags/a1_loc_$(date +%Y%m%d_%H%M%S) \
+  /localization/odom /localization/accel \
+  /lidar_odometry/pose /lidar_odometry/pose_quality /diagnostics /initialpose \
+  /a1_gnss/odom /a1_gnss/accel /a1_gnss/navsat \
+  /gsof_client/odom /gsof_client/navsat \
+  /gsof_client/gsof/ins_solution_49 /gsof_client/gsof/ins_solution_rms_50 \
+  /tf /tf_static /lidar_packets_loss
+
+# 터미널 3: GNSS 확인 → RViz 2D Pose Estimate → 활성화 → 출력 확인
+ros2 topic hz /a1_gnss/odom               # 약 100 Hz (0이면 여기서 멈추고 확인)
+ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
+  "{parameters: \"mola::LidarOdometry:lidar_odom:\\n  active: true\\n\"}"
+ros2 topic echo /lidar_odometry/pose_quality   # 0.5 이상
+ros2 topic hz /localization/odom          # 약 100 Hz면 완료
 ```
 
-기본 지도는 `<workspace>/maps/track/map`이며 다른 지도는
-`map:=<prefix 또는 .mm 경로>`로 지정한다. MOLA는 꺼진 상태로 시작하므로 다음 두
-단계를 거쳐야 `/localization/odom`이 나온다.
-
-1. RViz의 **2D Pose Estimate**로 차의 위치와 방향을 찍는다. 초기 yaw 오차가
-   5°를 넘으면 ICP가 붙지 않을 수 있다.
-2. MOLA를 활성화한다.
-
-   ```zsh
-   ros2 service call /mola_runtime_param_set mola_msgs/srv/MolaRuntimeParamSet \
-     "{parameters: \"mola::LidarOdometry:lidar_odom:\\n  active: true\\n\"}"
-   ```
+MOLA는 꺼진 상태로 시작하므로 RViz의 **2D Pose Estimate**로 차의 위치와 방향을
+찍고(초기 yaw 오차 5° 이내) 활성화해야 `/localization/odom`이 나온다. 끌 때는
+녹화 → launch 순서이며, `ros2 bag info`로 `/localization/odom` 개수가 녹화
+시간(초) × 100 정도인지 확인한다. 포인트 클라우드까지 녹화하려면 녹화 명령 끝에
+`/lidar_points`를 추가한다(분당 약 2 GB).
 
 두 launch 모두 `a1_localization` `mola.launch.py`의 다른 인자(`rviz:=false`,
-`start_lidar_driver:=false` 등)를 뒤에 붙일 수 있다. LiDAR만으로 실행하는 모드는
-없다. 항상 LiDAR와 GNSS/INS를 함께 사용한다.
+`start_lidar_driver:=false` 등)를 뒤에 붙일 수 있다.
 
 ## LiDAR 드라이버만 실행
 

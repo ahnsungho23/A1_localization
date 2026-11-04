@@ -5,15 +5,18 @@
 On the vehicle, start LiDAR, Applanix GNSS/INS, vehicle TF, MOLA, the merger
 and RViz together:
 
-```zsh
-source /opt/ros/humble/setup.zsh
-source install/setup.zsh
-ros2 launch a1_bringup localization.launch.py
+```bash
+source /opt/ros/humble/setup.bash
+WS=$HOME/git/A1_localization
+source $WS/install/setup.bash
+MAP_DIR=$WS/maps/track_20261104      # an existing map folder (ls $WS/maps/)
+ros2 launch a1_bringup localization.launch.py map:=$MAP_DIR/map
 ```
 
-The default map is `<workspace>/maps/track/map`; use
-`map:=<map prefix or .mm path>` for another one. The launch refuses to start
-without the `.mm` file. It passes the metric map and, when present, the
+Without `map:=` the map is `<workspace>/maps/track/map`. Use the full-track
+`map.mm` rebuilt from the simplemap ([mapping](mola_mapping.md#build-the-full-map-required)),
+not the local map saved by `/map_save`. The launch refuses to start without the
+`.mm` file. It passes the metric map and, when present, the
 matching `.simplemap` to MOLA, with these upstream launch arguments:
 
 ```text

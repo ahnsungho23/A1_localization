@@ -49,7 +49,8 @@ straight drive that `/a1_gnss/odom` shows `vx` ≈ speed and `vy` ≈ 0.
 ## Vehicle extrinsics
 
 `a1_gnss_bringup/config/vehicle_extrinsics.yaml` holds the measured mounting
-poses relative to `base_link` (REP-103 axes, meters, degrees):
+poses relative to `base_link` (REP-103 axes, meters, degrees). The `base_link`
+origin is the center of the rear axle on the ground (z = 0 at ground level):
 
 | Transform | x, y, z | roll, pitch, yaw |
 | --- | --- | --- |

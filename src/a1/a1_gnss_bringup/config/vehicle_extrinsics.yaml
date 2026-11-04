@@ -5,8 +5,8 @@
 # vehicle_tf.launch.py and gnss.launch.py refuse to start while any value is
 # null (not measured).
 #
-# base_link origin: TODO record the chosen reference point (e.g. rear axle
-# center at ground level) here when it is decided.
+# base_link origin: center of the rear axle, projected onto the ground
+# (z = 0 at ground level).
 base_link_to_ins:            
   # Applanix output point as configured on the device (not shifted to base_link).
   frame_id: ins

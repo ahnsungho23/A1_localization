@@ -28,6 +28,7 @@ map ──[MOLA bridge]──▶ odom ──[gnss_odom_relay]──▶ base_link
                                                             └──[static]──▶ hesai_lidar
 ```
 
+- `base_link`: 뒷바퀴 축 중심을 지면에 내린 점(z = 0이 지면). x 전방, y 좌측, z 위.
 - `map → odom`: MOLA. `odom → base_link`: relay(INS).
 - `base_link → ins`, `base_link → hesai_lidar`: `a1_gnss_bringup/config/vehicle_extrinsics.yaml`
   값으로 static TF 발행.

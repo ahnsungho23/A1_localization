@@ -6,6 +6,7 @@
 ## `/localization/odom` (`nav_msgs/msg/Odometry`)
 
 `header.frame_id = map`, `child_frame_id = base_link`
+(`base_link`: 뒷바퀴 축 중심의 지면 위 점, x 전방, y 좌측, z 위)
 
 | 필드 | 단위 | 내용 |
 | --- | --- | --- |

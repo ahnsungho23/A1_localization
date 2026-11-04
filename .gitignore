@@ -16,6 +16,7 @@ rosbag*/
 /maps/**
 !/maps/track/
 !/maps/track/.gitkeep
+!/maps/track/raceline_*
 
 # personal throwaway scripts
 /tools/scratch/

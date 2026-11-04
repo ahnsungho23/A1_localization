@@ -14,7 +14,8 @@ Outputs:
   /a1_gnss/odom        nav_msgs/Odometry   odom -> base_link
   /a1_gnss/navsat      sensor_msgs/NavSatFix (same content, converted stamp)
   /a1_gnss/accel       geometry_msgs/AccelWithCovarianceStamped, linear
-                       acceleration in base_link axes (unfiltered, ~100 Hz)
+                       acceleration of base_link in base_link axes (unfiltered,
+                       ~100 Hz)
 
 With time_source=gps the driver stamps GPS-epoch time (week * 604800 s + ms,
 counted from 1980-01-06), which is not comparable to ROS/LiDAR UTC Unix time.
@@ -27,8 +28,18 @@ static base_link -> ins extrinsic:
 
   T_odom_base = T_odom_ins * inv(T_base_ins)
 
-The acceleration is only rotated into base_link axes; the lever-arm terms
-(angular acceleration and centripetal) are not added.
+The acceleration (measured at the INS output point) is rotated into base_link
+axes and moved to base_link with the rigid-body two-point relation, yaw only:
+
+  a_base = a_ins - alpha x p - w x (w x p),   w = (0, 0, w_z), p = base_link -> ins
+
+  a_base_x = a_ins_x + alpha_z p_y + w_z^2 p_x
+  a_base_y = a_ins_y - alpha_z p_x + w_z^2 p_y
+
+alpha_z is the finite difference of consecutive GSOF #49 yaw rates over GPS
+time. It is noisy per sample; a moving average downstream (the merger)
+telescopes it to (w_z(t) - w_z(t - T)) / T. Roll/pitch terms are left out: at
+the 0.5 m mounting height their rates are dominated by body vibration.
 """
 
 import math
@@ -151,6 +162,7 @@ class GnssOdomRelay(Node):
             NavigationSolution49, input_ins, self.on_ins_solution, 100)
 
         self.warned_child_frame = False
+        self.prev_yaw_rate = None  # (gps time [s], w_z [rad/s]) of the last GSOF #49
 
         self.get_logger().info(
             f"{input_odom} -> {self.odom_frame}->{self.base_frame} "
@@ -187,7 +199,23 @@ class GnssOdomRelay(Node):
         # Applanix vehicle axes (long = forward, trans = right, down) -> FLU of
         # the INS, then into base_link axes.
         a_ins = (msg.acc_long, -msg.acc_trans, -msg.acc_down)
-        a_base = quat_rotate(self.q_base_ins, a_ins)
+        a_x, a_y, a_z = quat_rotate(self.q_base_ins, a_ins)
+
+        # Two-point lever-arm terms (yaw only), INS output point -> base_link.
+        w_ins = tuple(math.radians(r) for r in (
+            msg.ang_rate_long, -msg.ang_rate_trans, -msg.ang_rate_down))
+        w_z = quat_rotate(self.q_base_ins, w_ins)[2]
+        gps_t = msg.gps_time.week * 604800.0 + msg.gps_time.time * 1e-3
+        alpha_z = 0.0
+        if self.prev_yaw_rate is not None:
+            dt = gps_t - self.prev_yaw_rate[0]
+            if 0.0 < dt <= 0.1:
+                alpha_z = (w_z - self.prev_yaw_rate[1]) / dt
+        self.prev_yaw_rate = (gps_t, w_z)
+        p_x, p_y = self.p_base_ins[0], self.p_base_ins[1]
+        a_base = (a_x + alpha_z * p_y + w_z * w_z * p_x,
+                  a_y - alpha_z * p_x + w_z * w_z * p_y,
+                  a_z)
 
         out = AccelWithCovarianceStamped()
         out.header.stamp = self.convert_stamp(msg.header.stamp)

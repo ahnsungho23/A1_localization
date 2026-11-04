@@ -29,7 +29,7 @@ heading은 같은 메시지의 quaternion에서 계산한 값이다.
 
 | 필드 | 단위 | 내용 |
 | --- | --- | --- |
-| `accel.accel.linear.x/y` | m/s² | INS 가속도(GSOF #49)를 `base_link` 축으로 돌린 값의 최근 0.4 s 평균. 약 0.2 s 늦음 |
+| `accel.accel.linear.x/y` | m/s² | INS 가속도(GSOF #49)를 `base_link` 축으로 돌리고 두 점 정리(yaw 성분)로 `base_link` 위치의 가속도로 옮긴 값의 최근 0.4 s 평균. 약 0.2 s 늦음 |
 | `accel.covariance` | | 고정값: σ_a = 0.3 m/s². 평균할 샘플이 없으면 `[0] = -1` |
 
 ## 정차 hold

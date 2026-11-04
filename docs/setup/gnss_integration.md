@@ -88,7 +88,7 @@ clock by more than `max_clock_offset_sec` (1 s).
 | --- | --- | --- |
 | `/tf` | | `odom -> base_link` |
 | `/a1_gnss/odom` | `nav_msgs/Odometry` | pose `odom -> base_link`; twist in `base_link` axes: `v_b = R_bi v_i - ω_b × p_bi`, `ω_b = R_bi ω_i`; covariances passed through from the driver |
-| `/a1_gnss/accel` | `geometry_msgs/AccelWithCovarianceStamped` | GSOF #49 `(acc_long, -acc_trans, -acc_down)` rotated into `base_link` axes; gravity-free, unfiltered; lever-arm terms not added; `covariance[0] = -1` (no uncertainty in #49) |
+| `/a1_gnss/accel` | `geometry_msgs/AccelWithCovarianceStamped` | GSOF #49 `(acc_long, -acc_trans, -acc_down)` rotated into `base_link` axes and moved from the INS point to `base_link` with the two-point relation, yaw only: `a_x + ω_z² p_x`, `a_y − α_z p_x` (`α_z` = finite difference of the GSOF #49 yaw rate); gravity-free, unfiltered; `covariance[0] = -1` (no uncertainty in #49) |
 | `/a1_gnss/navsat` | `sensor_msgs/NavSatFix` | driver NavSatFix with the converted stamp; recorded by MOLA for georeferencing |
 
 ## Controller output (`/localization/odom`, `/localization/accel`)

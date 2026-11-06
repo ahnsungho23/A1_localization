@@ -195,7 +195,7 @@ ros2 bag record -s mcap -o ~/rosbags/a1_loc_$(date +%Y%m%d_%H%M%S) \
   /a1_gnss/odom /a1_gnss/accel /a1_gnss/navsat \
   /gsof_client/odom /gsof_client/navsat \
   /gsof_client/gsof/ins_solution_49 /gsof_client/gsof/ins_solution_rms_50 \
-  /tf /tf_static /lidar_packets_loss
+  /tf /tf_static /lidar_packets_loss /control/status/wheel_info
 
 # 터미널 3: GNSS 확인 → RViz 2D Pose Estimate → 활성화 → 출력 확인
 ros2 topic hz /a1_gnss/odom               # 약 100 Hz (0이면 여기서 멈추고 확인)
